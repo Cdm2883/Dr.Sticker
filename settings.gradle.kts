@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "modern-compose-android-app-template"
-include(":app")
+rootProject.name = "DrSticker"
+include(":android")
