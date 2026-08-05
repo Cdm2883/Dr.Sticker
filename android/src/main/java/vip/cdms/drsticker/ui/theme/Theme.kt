@@ -10,7 +10,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -531,31 +534,62 @@ data class ColorFamily(
     val onColorContainer: Color
 )
 
-val unspecified_scheme = ColorFamily(
-    Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
-)
+//val unspecified_scheme = ColorFamily(
+//    Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
+//)
+
+internal val LocalExtendedColorScheme = staticCompositionLocalOf { extendedLight }
+
+@Suppress("UnusedReceiverParameter")
+val MaterialTheme.extendedColorScheme
+    @Composable @ReadOnlyComposable get() = LocalExtendedColorScheme.current
+
+internal val LocalIsDarkTheme = staticCompositionLocalOf { false }
+
+@Suppress("UnusedReceiverParameter")
+val MaterialTheme.darkTheme
+    @Composable @ReadOnlyComposable get() = LocalIsDarkTheme.current
+
+enum class Contrast { Normal, Medium, High }
+
+fun getDefaultColorSchemes(darkTheme: Boolean, contrast: Contrast) = when {
+    darkTheme -> when (contrast) {
+        Contrast.Normal -> darkScheme to extendedDark
+        Contrast.Medium -> mediumContrastDarkColorScheme to extendedDarkMediumContrast
+        Contrast.High -> highContrastDarkColorScheme to extendedDarkHighContrast
+    }
+
+    else -> when (contrast) {
+        Contrast.Normal -> lightScheme to extendedLight
+        Contrast.Medium -> mediumContrastLightColorScheme to extendedLightMediumContrast
+        Contrast.High -> highContrastLightColorScheme to extendedLightHighContrast
+    }
+}
 
 @Composable
 fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    contrast: Contrast = Contrast.Normal,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> darkScheme
-        else -> lightScheme
+    val (defaultColorScheme, extendedColorScheme) = getDefaultColorSchemes(darkTheme, contrast)
+    val colorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val context = LocalContext.current
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else {
+        defaultColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalExtendedColorScheme provides extendedColorScheme,
+        LocalIsDarkTheme provides darkTheme,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            content = content
+        )
+    }
 }
-

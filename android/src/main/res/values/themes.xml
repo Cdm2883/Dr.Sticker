@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.DrSticker.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#3f6836</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.DrSticker</item>
+    </style>
+
+    <style name="Theme.DrSticker.SplashScreen.Crash" parent="Theme.DrSticker.SplashScreen">
+        <item name="windowSplashScreenBackground">#BA1A1A</item>
+    </style>
 
     <style name="Theme.DrSticker" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
