@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path
+        name="internal_sticker_files"
+        path="stickers/" />
+    <external-files-path
+        name="external_sticker_files"
+        path="stickers/" />
+
+    <cache-path
+        name="preprocess_cache"
+        path="preprocess/" />
+</paths>

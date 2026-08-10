@@ -26,6 +26,9 @@ data class SourceStickerSet<T : SourceStickerResource>(
 interface SourceStickerResource {
     val extension: String
 
+    fun getRealExtension() =
+        extension.substringAfterLast('.')
+
     companion object {
         fun thumbnailExtension(extension: String) = "thumbnail.$extension"
     }

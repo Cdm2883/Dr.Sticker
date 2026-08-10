@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -25,12 +27,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import vip.cdms.drsticker.services.StickerServiceState
 import vip.cdms.drsticker.ui.components.AboutBottomSheet
+import vip.cdms.drsticker.ui.models.MainScreenModel
 import vip.cdms.drsticker.ui.utils.rememberScrollToHideBottomBarState
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -64,6 +68,7 @@ fun MainScreen() {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             MainFloatingActionButton(
+                viewModel = viewModel,
                 modifier = Modifier.offset {
                     scrollToHideBottomBarState.bottomBarOffset
                 },
@@ -89,13 +94,13 @@ fun MainScreen() {
                     DashboardPage()
                 }
 
-                composable<StickersRoute>(
+                composable<StickerSetsRoute>(
                     enterTransition = navBarEnterTransition,
                     exitTransition = navBarExitTransition,
                     popEnterTransition = navBarEnterTransition,
                     popExitTransition = navBarExitTransition
                 ) {
-                    StickersPage(
+                    StickerSetsPage(
                         onStickerSetDetail = { navController.navigate(StickerSetDetailRoute(it)) },
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = this@composable,
@@ -109,13 +114,24 @@ fun MainScreen() {
                     )
                 }
 
-                composable<RulesetRoute>(
+                composable<RulesetsRoute>(
                     enterTransition = navBarEnterTransition,
                     exitTransition = navBarExitTransition,
                     popEnterTransition = navBarEnterTransition,
                     popExitTransition = navBarExitTransition
                 ) {
-                    RulesetPage()
+                    RulesetsPage(
+                        onRulesetDetail = { navController.navigate(RulesetDetailRoute(it)) },
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable,
+                    )
+                }
+                composable<RulesetDetailRoute> {
+                    RulesetDetail(
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable,
+                        onBack = { navController.popBackStack() },
+                    )
                 }
             }
         }
@@ -125,25 +141,19 @@ fun MainScreen() {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun MainFloatingActionButton(
+    viewModel: MainScreenModel,
     modifier: Modifier = Modifier,
     onClickAbout: () -> Unit,
 ) {
-    val items = listOf(
-//        Icons.AutoMirrored.Rounded.Message to "Reply",
-//        Icons.Rounded.People to "Reply all",
-//        Icons.Rounded.Contacts to "Forward",
-//        Icons.Rounded.Snooze to "Snooze",
-//        Icons.Rounded.Archive to "Archive",
-//        Icons.AutoMirrored.Rounded.Label to "Label",
-
-        Icons.Rounded.Layers to "Open Sheet" to {},
-        Icons.Rounded.ImportExport to "Import / Export" to {},
-        Icons.Rounded.Info to "About" to onClickAbout,
-    )
-
+    val serviceState by viewModel.serviceState.collectAsStateWithLifecycle()
+    val activated = serviceState == StickerServiceState.Running
     var expanded by rememberSaveable { mutableStateOf(false) }
 
-    var activated by rememberSaveable { mutableStateOf(false) }
+    val items = listOf(
+        Icons.Rounded.Layers to "Open Sheet" to viewModel::openPickerSheet,
+        Icons.Rounded.ImportExport to "Import / Export" to { TODO() },
+        Icons.Rounded.Info to "About" to onClickAbout,
+    )
 
     BackHandler(expanded) { expanded = false }
 
@@ -157,11 +167,17 @@ private fun MainFloatingActionButton(
             SplitButtonLayout(
                 leadingButton = {
                     SplitButtonDefaults.LeadingButton(
-                        onClick = { activated = !activated },
+                        onClick = viewModel::toggleStickerService,
                         colors = buttonColors,
                     ) {
                         Icon(
-                            imageVector = if (activated) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            imageVector = when (serviceState) {
+                                StickerServiceState.Stopped -> Icons.Rounded.PlayArrow
+                                StickerServiceState.Starting -> Icons.Rounded.PlayArrow
+                                StickerServiceState.Running -> Icons.Rounded.Pause
+                                StickerServiceState.Stopping -> Icons.Rounded.Pause
+                                is StickerServiceState.Failed -> Icons.Rounded.Error
+                            },
                             modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
                             contentDescription = null,
                         )
@@ -259,14 +275,14 @@ private fun MainNavigationBar(
             label = { Text("Dashboard") }
         )
         NavigationBarItem(
-            selected = currentDestination?.hasRoute<StickersRoute>() == true,
-            onClick = { navigateTo(StickersRoute) },
+            selected = currentDestination?.hasRoute<StickerSetsRoute>() == true,
+            onClick = { navigateTo(StickerSetsRoute) },
             icon = { Icon(Icons.Rounded.EmojiSymbols, contentDescription = null) },
             label = { Text("Stickers") }
         )
         NavigationBarItem(
-            selected = currentDestination?.hasRoute<RulesetRoute>() == true,
-            onClick = { navigateTo(RulesetRoute) },
+            selected = currentDestination?.hasRoute<RulesetsRoute>() == true,
+            onClick = { navigateTo(RulesetsRoute) },
             icon = { Icon(Icons.Rounded.DesignServices, contentDescription = null) },
             label = { Text("Ruleset") }
         )
@@ -277,8 +293,8 @@ private fun NavDestination?.navBarIndex(): Int {
     if (this == null) return -1
     return when {
         hasRoute<DashboardRoute>() -> 0
-        hasRoute<StickersRoute>() -> 1
-        hasRoute<RulesetRoute>() -> 2
+        hasRoute<StickerSetsRoute>() -> 1
+        hasRoute<RulesetsRoute>() -> 2
         else -> -1
     }
 }

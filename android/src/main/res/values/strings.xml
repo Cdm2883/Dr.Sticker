@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Dr.Sticker</string>
+
+    <string name="accessibility_description">TODO_2</string>
 </resources>

@@ -40,12 +40,12 @@ import vip.cdms.drsticker.ui.utils.thenIf
 import vip.cdms.drsticker.utils.vibrate
 
 @Serializable
-object StickersRoute
+object StickerSetsRoute
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun StickersPage(
-    viewModel: StickersPageModel = hiltViewModel(),
+fun StickerSetsPage(
+    viewModel: StickerSetsPageModel = hiltViewModel(),
     onStickerSetDetail: (StickerSetId) -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
@@ -76,7 +76,7 @@ fun StickersPage(
                 title = { Text("Stickers", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 subtitle = { Text("$stickerSetCount installed.", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
-                    SortIconButton(
+                    StickerSortIconButton(
                         sortStrategy = state.sortStrategy,
                         isManualSorting = state.isManualSorting,
                         onRequestManualSorting = viewModel::beginManualSorting,
@@ -246,7 +246,7 @@ fun StickersPage(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReorderableCollectionItemScope.StickerListItem(
+private fun ReorderableCollectionItemScope.StickerListItem(
     entry: StickerSetListEntry.StickerSet,
     modifier: Modifier,
     modifierCover: Modifier,
@@ -347,7 +347,7 @@ fun ReorderableCollectionItemScope.StickerListItem(
 )
 
 @Composable
-fun ReorderableCollectionItemScope.StickerLoadErrorListItem(
+private fun ReorderableCollectionItemScope.StickerLoadErrorListItem(
     entry: StickerSetListEntry.LoadError,
     isSorting: Boolean,
     onRemove: () -> Unit,
@@ -380,7 +380,7 @@ fun ReorderableCollectionItemScope.StickerLoadErrorListItem(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PickStickerSetDialog(
+private fun PickStickerSetDialog(
     state: StickerSetPickerState,
     onDismissRequest: () -> Unit,
     onAddRequest: (StickerSourceOption) -> Unit,
@@ -564,7 +564,7 @@ fun PickStickerSetDialog(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun StickerSetConfigDialog(
+private fun StickerSetConfigDialog(
     state: StickerSetConfigState,
     metadataProvider: (String) -> StickerSourceMetadata<*>,
     onDismissRequest: () -> Unit,

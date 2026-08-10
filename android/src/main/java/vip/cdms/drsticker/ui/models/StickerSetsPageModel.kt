@@ -91,7 +91,7 @@ sealed interface StickerSetListEntry {
 }
 
 @HiltViewModel
-class StickersPageModel @Inject constructor(
+class StickerSetsPageModel @Inject constructor(
     private val stickerRepository: StickerRepository,
     private val statisticRepository: StatisticRepository,
 ) : ViewModel() {

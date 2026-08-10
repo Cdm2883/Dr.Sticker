@@ -2,8 +2,8 @@ package vip.cdms.drsticker.data.repositories
 
 import kotlinx.serialization.json.Json
 import vip.cdms.drsticker.data.*
-import vip.cdms.drsticker.data.injection.ConfigJson
-import vip.cdms.drsticker.data.injection.StorageManager
+import vip.cdms.drsticker.data.injection.StickerConfigJson
+import vip.cdms.drsticker.data.injection.StorageConstants
 import vip.cdms.drsticker.data.utils.BufferedFile
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,12 +11,12 @@ import kotlin.time.Duration.Companion.seconds
 
 @Singleton
 class StatisticRepository @Inject constructor(
-    private val storageManager: StorageManager,
-    @param:ConfigJson private val json: Json,
+    private val storageConstants: StorageConstants,
+    @param:StickerConfigJson private val json: Json,
     private val stickerRepository: StickerRepository,
 ) {
     private val statistics = BufferedFile(
-        file = storageManager.getStatisticFile(),
+        file = storageConstants.getStatisticFile(),
         defaultValue = ::emptyMap,
         decode = { json.decodeFromString<Statistics>(it) },
         encode = { json.encodeToString(it) },
@@ -42,20 +42,29 @@ class StatisticRepository @Inject constructor(
         return result
     }
 
-    fun getSortedStickers(setId: StickerSetId): List<StickerId> {
-        val sourceOrder = stickerRepository.getMergedStickerSet(setId).stickers.map { it.stickerId }
+    fun <T : SourceStickerResource> getSortedStickers(
+        setId: StickerSetId,
+        stickers: List<SourceSticker<T>>,
+    ): List<SourceSticker<T>> {
         val sorts = getSortsConfig()
         val override = sorts.stickersOverrides[setId]
         val strategy = override?.strategy ?: sorts.stickersStrategy
         if (strategy == SortStrategy.MANUAL) {
-            val existing = sourceOrder.toHashSet()
-            val manual = override?.manual.orEmpty().filter { it in existing }.distinct()
-            return manual + sourceOrder.filterNot { it in manual }
+            val manual = override?.manual.orEmpty()
+            val manualRanks = HashMap<StickerId, Int>(manual.size)
+            manual.forEachIndexed { rank, stickerId ->
+                manualRanks.putIfAbsent(stickerId, rank)
+            }
+            return stickers.sortedBy { manualRanks[it.stickerId] ?: Int.MAX_VALUE }
         }
         val statistics = statistics.get()[setId]?.stickers.orEmpty()
         return when (strategy) {
-            SortStrategy.RECENCY -> sourceOrder.sortedByDescending { statistics[it]?.last ?: 0L }
-            SortStrategy.FREQUENCY -> sourceOrder.sortedByDescending { statistics[it]?.counts ?: 0L }
+            SortStrategy.RECENCY -> stickers.sortedByDescending {
+                statistics[it.stickerId]?.last ?: 0L
+            }
+            SortStrategy.FREQUENCY -> stickers.sortedByDescending {
+                statistics[it.stickerId]?.counts ?: 0L
+            }
             SortStrategy.SMART -> TODO()
             else -> throw IllegalStateException()
         }
@@ -99,12 +108,12 @@ class StatisticRepository @Inject constructor(
         updateStickerOverride(setId) { it.copy(manual = manual.distinct()) }
 
     private fun getSortsConfig(): SortsConfig {
-        val file = storageManager.getSortsFile()
+        val file = storageConstants.getSortsFile()
         return json.decodeFromString(file.takeIf { it.exists() }?.readText() ?: "{}")
     }
 
     private fun updateSortsConfig(transform: (SortsConfig) -> SortsConfig) =
-        storageManager.getSortsFile().writeText(json.encodeToString(transform(getSortsConfig())))
+        storageConstants.getSortsFile().writeText(json.encodeToString(transform(getSortsConfig())))
 
     private fun updateStickerOverride(
         setId: StickerSetId,

@@ -34,7 +34,7 @@ import kotlinx.serialization.Serializable
 import vip.cdms.drsticker.data.SortStrategy
 import vip.cdms.drsticker.data.StickerSetId
 import vip.cdms.drsticker.ui.components.CombinedClickableIconButton
-import vip.cdms.drsticker.ui.components.SortIconButton
+import vip.cdms.drsticker.ui.components.StickerSortIconButton
 import vip.cdms.drsticker.ui.models.StickerSetDetailModel
 import vip.cdms.drsticker.ui.utils.rememberDisabledTopOverscrollEffect
 import vip.cdms.drsticker.ui.utils.thenIf
@@ -50,13 +50,13 @@ fun StickerSetDetail(
     viewModel: StickerSetDetailModel = hiltViewModel(),
     onBack: () -> Unit,
 ) {
-    var titleValue by remember { mutableStateOf("Sticker Pack Name") }
-    var subtitleValue by remember { mutableStateOf("Description text") }
-
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val density = LocalDensity.current
+
+    @SuppressLint("ConfigurationScreenWidthHeight")
+    val stickerPreviewSize = ((LocalConfiguration.current.screenWidthDp - 8 * (4 - 1) - 16 * 2) / 4).dp
     val barCollapsedHeight = 64.dp
-    val barMaxExpandedHeight = 232.dp
+    val barMaxExpandedHeight = barCollapsedHeight + stickerPreviewSize + 16.dp
     val barHeightOffsetLimitPx = with(density) { (barCollapsedHeight - barMaxExpandedHeight).toPx() }
     SideEffect {
         if (scrollBehavior.state.heightOffsetLimit != barHeightOffsetLimitPx) {
@@ -108,7 +108,7 @@ fun StickerSetDetail(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            titleValue,
+                            "Sticker Pack Name",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontSize = 20.sp
                             ),
@@ -117,7 +117,7 @@ fun StickerSetDetail(
                             modifier = Modifier.weight(1f).alpha(collapseFraction)
                                 .thenIf(collapseFraction >= 0.05f) {
                                     with(sharedTransitionScope) {
-                                        sharedBounds(
+                                        sharedElement(
                                             rememberSharedContentState(key = "title_" + viewModel.setId),
                                             animatedVisibilityScope = animatedVisibilityScope,
                                         )
@@ -130,7 +130,7 @@ fun StickerSetDetail(
                             var openResetDialog by remember { mutableStateOf(false) }
                             var openDeleteDialog by remember { mutableStateOf(false) }
 
-                            SortIconButton(
+                            StickerSortIconButton(
                                 sortStrategy = overrideSortStrategy ?: globalSortStrategy,
                                 isManualSorting = isManualSorting,
                                 onRequestManualSorting = { isManualSorting = true },
@@ -203,7 +203,7 @@ fun StickerSetDetail(
                             .fillMaxWidth()
                             .offset(y = (-8).dp)
                             .weight(1f)
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .padding(horizontal = 16.dp)
                             .alpha(1f - collapseFraction)
                             .graphicsLayer {
                                 translationY = -(collapseFraction * 50f)
@@ -214,7 +214,7 @@ fun StickerSetDetail(
                         Spacer(
                             modifier = Modifier
                                 .padding(top = 8.dp)
-                                .size(((LocalConfiguration.current.screenWidthDp - 8 * (4 - 1) - 16 * 2) / 4).dp)
+                                .size(stickerPreviewSize)
                                 .background(
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                     shape = MaterialTheme.shapes.medium,
@@ -230,15 +230,13 @@ fun StickerSetDetail(
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = 16.dp),
                         ) {
-                            OutlinedTextField(
-                                value = titleValue,
-                                onValueChange = { titleValue = it },
-                                label = { Text("Display Name") },
-                                singleLine = true,
-                                enabled = collapseFraction < 0.05f,
-                                modifier = Modifier.fillMaxWidth()
+                            Text(
+                                "Sticker Pack Name",
+                                modifier = Modifier
                                     .thenIf(collapseFraction < 0.05f) {
                                         with(sharedTransitionScope) {
                                             sharedBounds(
@@ -246,25 +244,20 @@ fun StickerSetDetail(
                                                 animatedVisibilityScope = animatedVisibilityScope,
                                             )
                                         }
-                                    }
+                                    },
+                                style = MaterialTheme.typography.headlineSmallEmphasized,
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = subtitleValue,
-                                onValueChange = { subtitleValue = it },
-                                label = { Text("Description") },
-                                singleLine = false,
-                                minLines = 2,
-                                enabled = collapseFraction < 0.05f,
-                                modifier = Modifier.fillMaxWidth()
-                                    .run {
-                                        with(sharedTransitionScope) {
-                                            sharedBounds(
-                                                rememberSharedContentState(key = "desc_" + viewModel.setId),
-                                                animatedVisibilityScope = animatedVisibilityScope,
-                                            )
-                                        }
+                            Text(
+                                "Description text",
+                                modifier = run {
+                                    with(sharedTransitionScope) {
+                                        Modifier.sharedBounds(
+                                            rememberSharedContentState(key = "desc_" + viewModel.setId),
+                                            animatedVisibilityScope = animatedVisibilityScope,
+                                        )
                                     }
+                                },
+                                style = MaterialTheme.typography.bodyMediumEmphasized,
                             )
                         }
                     }
@@ -285,7 +278,7 @@ fun StickerSetDetail(
                     }
                 },
             contentPadding = PaddingValues(horizontal = 16.dp) +
-                    PaddingValues(top = 8.dp, bottom = 200.dp),
+                    PaddingValues(bottom = 200.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             overscrollEffect = rememberDisabledTopOverscrollEffect(),

@@ -21,7 +21,11 @@ import kotlin.reflect.KClass
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class ConfigJson
+annotation class StickerConfigJson
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class RulesetConfigJson
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -36,8 +40,8 @@ object JsonModule {
     @OptIn(ExperimentalSerializationApi::class)
     @Provides
     @Singleton
-    @ConfigJson
-    fun provideConfigJson(
+    @StickerConfigJson
+    fun provideStickerConfigJson(
         normalJson: Json,
         metadataMap: Map<String, @JvmSuppressWildcards StickerSourceMetadata<*>>,
         stickerRepositoryProvider: Provider<StickerRepository>,
@@ -67,5 +71,17 @@ object JsonModule {
                 }
             }
         }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Provides
+    @Singleton
+    @RulesetConfigJson
+    fun provideRulesetConfigJson(
+        normalJson: Json,
+    ) = Json(normalJson) {
+        namingStrategy = JsonNamingStrategy.SnakeCase
+        prettyPrint = true
+        encodeDefaults = true
     }
 }

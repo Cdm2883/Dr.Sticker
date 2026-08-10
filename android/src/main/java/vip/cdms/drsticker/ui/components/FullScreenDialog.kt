@@ -1,6 +1,7 @@
 package vip.cdms.drsticker.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -41,6 +42,52 @@ fun FullScreenDialog(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = remember { FullScreenDialogScope(snackbarHostState) }
 
+    FullScreenOverlay(
+        visible = visible,
+        onDismissRequest = onDismissRequest,
+    ) {
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        CompositionLocalProvider(
+                            LocalTextStyle provides MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 20.sp
+                            ),
+                            content = title
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismissRequest) {
+                            Icon(Icons.Rounded.Close, contentDescription = null)
+                        }
+                    },
+                    actions = {
+                        actions?.let {
+                            it()
+                            Spacer(Modifier.size(8.dp))
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) {
+            with(scope) {
+                content(it)
+            }
+        }
+    }
+}
+
+@Composable
+fun FullScreenOverlay(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    content: @Composable AnimatedVisibilityScope.() -> Unit,
+) {
     val transitionState = remember { MutableTransitionState(false) }
     transitionState.targetState = visible
 
@@ -64,45 +111,11 @@ fun FullScreenDialog(
                 insetsController.isAppearanceLightNavigationBars = !isDarkTheme
             }
         }
-
         AnimatedVisibility(
             visibleState = transitionState,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
-        ) {
-            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-            Scaffold(
-                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            CompositionLocalProvider(
-                                LocalTextStyle provides MaterialTheme.typography.titleLarge.copy(
-                                    fontSize = 20.sp
-                                ),
-                                content = title
-                            )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onDismissRequest) {
-                                Icon(Icons.Rounded.Close, contentDescription = null)
-                            }
-                        },
-                        actions = {
-                            actions?.let {
-                                it()
-                                Spacer(Modifier.size(8.dp))
-                            }
-                        },
-                        scrollBehavior = scrollBehavior,
-                    )
-                },
-                snackbarHost = { SnackbarHost(snackbarHostState) },
-            ) {
-                with(scope) {
-                    content(it)
-                }
-            }
-        }
+            content = content
+        )
     }
 }

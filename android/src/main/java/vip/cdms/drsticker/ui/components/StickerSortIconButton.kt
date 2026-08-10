@@ -19,7 +19,7 @@ import vip.cdms.drsticker.data.SortStrategy
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SortIconButton(
+fun StickerSortIconButton(
     sortStrategy: SortStrategy,
     isManualSorting: Boolean,
     onRequestManualSorting: () -> Unit,

@@ -6,8 +6,8 @@ import kotlinx.serialization.json.*
 import okio.Sink
 import okio.sink
 import vip.cdms.drsticker.data.*
-import vip.cdms.drsticker.data.injection.ConfigJson
-import vip.cdms.drsticker.data.injection.StorageManager
+import vip.cdms.drsticker.data.injection.StickerConfigJson
+import vip.cdms.drsticker.data.injection.StorageConstants
 import java.io.File
 import java.util.*
 import javax.inject.Inject
@@ -15,26 +15,26 @@ import javax.inject.Singleton
 
 @Singleton
 class StickerRepository @Inject constructor(
-    private val storageManager: StorageManager,
-    @param:ConfigJson private val json: Json,
+    private val storageConstants: StorageConstants,
+    @param:StickerConfigJson private val json: Json,
     private val metadataMap: Map<String, @JvmSuppressWildcards StickerSourceMetadata<*>>,
     private val handlers: Map<String, @JvmSuppressWildcards StickerSourceHandler<*, *>>,
     private val downloaders: Map<Class<*>, @JvmSuppressWildcards StickerSourceDownloader<*, *>>,
 ) {
     fun getStickerSetIndexes(): List<StickerSetId?> = json.decodeFromString(
-        storageManager.getStickerSetIndexFile().takeIf { it.exists() }?.readText() ?: "[]"
+        storageConstants.getStickerSetIndexFile().takeIf { it.exists() }?.readText() ?: "[]"
     )
 
     fun setStickerSetIndexes(data: List<StickerSetId?>) {
         val trimmed = data.dropWhile { it == null }.dropLastWhile { it == null }
         val compacted = trimmed.filterIndexed { index, item -> item != null || trimmed[index - 1] != null }
         val text = json.encodeToString(compacted)
-        storageManager.getStickerSetIndexFile().writeText(text)
+        storageConstants.getStickerSetIndexFile().writeText(text)
     }
 
     fun getDetachedStickerSets(): List<StickerSetId> {
         val indexed = getStickerSetIndexes().filterNotNull().toHashSet()
-        return storageManager.getStickerSetIndexFile().parentFile
+        return storageConstants.getStickerSetIndexFile().parentFile
             ?.listFiles { file -> file.isDirectory && file.name !in indexed }
             .orEmpty()
             .sortedByDescending { directory ->
@@ -80,7 +80,7 @@ class StickerRepository @Inject constructor(
     ) {
         val serializer = getSourceMetadata(config).value
             .setSerializer as KSerializer<SourceStickerSet<SourceStickerResource>>
-        storageManager
+        storageConstants
             .getStickerSetSourceCacheFile(setId)
             .writeText(json.encodeToString(serializer, data))
     }
@@ -90,13 +90,13 @@ class StickerRepository @Inject constructor(
         val config = getStickerSetConfig(setId)
         val serializer = getSourceMetadata(config.source).value
             .setSerializer as KSerializer<SourceStickerSet<SourceStickerResource>>
-        val file = storageManager.getStickerSetSourceCacheFile(setId)
+        val file = storageConstants.getStickerSetSourceCacheFile(setId)
         val remote = json.decodeFromString(serializer, file.readText())
         return MergedStickerSet(config, remote)
     }
 
     fun getStickerSetConfig(setId: StickerSetId): StickerSetConfig = json.decodeFromString(
-        storageManager.getStickerSetConfigFile(setId).readText()
+        storageConstants.getStickerSetConfigFile(setId).readText()
     )
 
     fun updateStickerSetOverrides(setId: StickerSetId, overrides: StickerSetOverrides) =
@@ -134,13 +134,13 @@ class StickerRepository @Inject constructor(
         return effectiveJson(first) == effectiveJson(second)
     }
 
-    private fun setStickerSet(config: StickerSetConfig) = storageManager
+    private fun setStickerSet(config: StickerSetConfig) = storageConstants
         .getStickerSetConfigFile(config.setId)
         .writeText(json.encodeToString(config))
 
     fun deleteStickerSet(setId: StickerSetId) {
         setStickerSetIndexes(getStickerSetIndexes() - setId)
-        storageManager.getStickerSetDir(setId).deleteRecursively()
+        storageConstants.getStickerSetDir(setId).deleteRecursively()
     }
 
     suspend fun fetchStickerResource(
@@ -148,7 +148,7 @@ class StickerRepository @Inject constructor(
         stickerId: StickerId?,
         resource: SourceStickerResource,
     ): File {
-        val cacheFile = storageManager.getStickerCacheFile(setId, stickerId, resource.extension)
+        val cacheFile = storageConstants.getStickerCacheFile(setId, stickerId, resource.extension)
         if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile
         val config = getStickerSetConfig(setId).source
         try {
@@ -161,14 +161,14 @@ class StickerRepository @Inject constructor(
     }
 
     internal fun getStickerSourceEnv(sourceKey: String, fieldName: String): JsonElement? {
-        val file = storageManager.getStickerSourceEnvFile().takeIf { it.exists() } ?: return null
+        val file = storageConstants.getStickerSourceEnvFile().takeIf { it.exists() } ?: return null
         val root = json.decodeFromString<JsonObject>(file.readText())
         return root[sourceKey]?.jsonObject[fieldName]
     }
 
     /** @param value `null` implies deleting, or pass [kotlinx.serialization.json.JsonNull] explicitly. */
     private fun setStickerSourceEnv(sourceKey: String, fieldName: String, value: JsonElement?) {
-        val file = storageManager.getStickerSourceEnvFile()
+        val file = storageConstants.getStickerSourceEnvFile()
         val root = json.decodeFromString<JsonObject>(file.takeIf { it.exists() }?.readText() ?: "{}").toMutableMap()
         val envMap = root[sourceKey]?.jsonObject?.toMutableMap() ?: mutableMapOf()
         if (value == null) envMap.remove(fieldName) else envMap[fieldName] = value
@@ -179,7 +179,7 @@ class StickerRepository @Inject constructor(
 
     @OptIn(ExperimentalSerializationApi::class)
     fun getStickerSourceEnvs(sourceKey: String): SourceEnvValueProvider {
-        val file = storageManager.getStickerSourceEnvFile().takeIf(File::exists) ?: return { null }
+        val file = storageConstants.getStickerSourceEnvFile().takeIf(File::exists) ?: return { null }
         val root = json.decodeFromString<JsonObject>(file.readText())
         val envMap = root[sourceKey]?.jsonObject ?: return { null }
         val descriptor = getSourceMetadata(sourceKey).configSerializer.descriptor
