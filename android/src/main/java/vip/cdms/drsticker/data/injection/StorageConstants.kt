@@ -52,9 +52,9 @@ class StorageConstants @Inject constructor(
     private fun getPreprocessCacheDir() =
         cacheDir.resolve("preprocess").apply { mkdirs() }
 
-    fun getPreprocessCacheFile(hash: String) =
-        getPreprocessCacheDir().resolve(hash)
-
-    fun getPreprocessCacheMimeTypeTextFile(hash: String) =
+    fun getPreprocessCacheExtensionFile(hash: String) =
         getPreprocessCacheDir().resolve("$hash.txt")
+
+    fun getPreprocessCacheFile(hash: String, extension: String) =
+        getPreprocessCacheDir().resolve("$hash.$extension")
 }

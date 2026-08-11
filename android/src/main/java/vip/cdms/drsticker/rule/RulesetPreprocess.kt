@@ -8,19 +8,18 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToStream
 import vip.cdms.drsticker.data.StickerId
 import vip.cdms.drsticker.data.StickerSetId
-import java.io.File
 import java.io.OutputStream
 import java.security.MessageDigest
 
-data class StickerFile(
-    val file: File,
-    val mimeType: String,
+class ProcessingSticker(
+    val bytes: ByteArray,
+    val extension: String,
 )
 
 @Serializable
 sealed interface RulesetPreprocess
 interface PreprocessHandler<C : RulesetPreprocess> {
-    suspend fun process(config: C, input: StickerFile): StickerFile
+    suspend fun process(config: C, input: ProcessingSticker): ProcessingSticker
 }
 
 

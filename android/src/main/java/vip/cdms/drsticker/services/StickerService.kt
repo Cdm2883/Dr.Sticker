@@ -3,7 +3,6 @@ package vip.cdms.drsticker.services
 import android.app.Service
 import android.content.Intent
 import android.util.Log
-import android.webkit.MimeTypeMap
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import vip.cdms.drsticker.data.SourceStickerResource
@@ -15,9 +14,10 @@ import vip.cdms.drsticker.data.repositories.StickerRepository
 import vip.cdms.drsticker.rule.Ruleset
 import vip.cdms.drsticker.rule.adapters.AdapterResult
 import vip.cdms.drsticker.rule.preprocess.PreprocessCacheKey
-import vip.cdms.drsticker.rule.preprocess.StickerFile
+import vip.cdms.drsticker.rule.preprocess.ProcessingSticker
 import vip.cdms.drsticker.rule.triggers.TriggerSession
 import vip.cdms.drsticker.services.picker.StickerPickerSheetController
+import java.io.File
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -142,13 +142,12 @@ class StickerService : Service() {
         resource: SourceStickerResource,
     ) = try {
         val ruleset = activeRuleset ?: return
-        val source = withContext(Dispatchers.IO)
+        val original = withContext(Dispatchers.IO)
         { stickerRepository.fetchStickerResource(setId, stickerId, resource) }
-        val mimeType = MimeTypeMap.getSingleton()
-            .getMimeTypeFromExtension(resource.getRealExtension().lowercase())
-            ?: "application/octet-stream"
-        val original = StickerFile(source, mimeType)
-        val processed = preprocessSticker(setId, stickerId, ruleset, original)
+        val processed = preprocessSticker(
+            setId, stickerId, ruleset,
+            original, resource.getRealExtension()
+        )
         when (val result = rulesetRepository.getAdapterHandler(ruleset.adapter)
             .send(ruleset.adapter, processed)) {
             AdapterResult.Completed -> {
@@ -171,25 +170,26 @@ class StickerService : Service() {
         setId: StickerSetId,
         stickerId: StickerId,
         ruleset: Ruleset,
-        original: StickerFile,
-    ): StickerFile {
+        original: File,
+        originalExtension: String,
+    ): File {
         if (ruleset.preprocesses.isEmpty()) return original
 
         val cacheKey = PreprocessCacheKey(setId, stickerId, ruleset.preprocesses)
         withContext(Dispatchers.IO)
         { rulesetRepository.getPreprocessCache(cacheKey) }?.let { return it }
 
+        val initial = ProcessingSticker(original.readBytes(), originalExtension)
         val processed = ruleset.preprocesses
-            .fold(original) { input, config ->
+            .fold(initial) { input, config ->
                 rulesetRepository
                     .getPreprocessHandler(config)
                     .process(config, input)
             }
-        withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             rulesetRepository
                 .updatePreprocessCache(cacheKey, processed)
         }
-        return processed
     }
 
     private fun fail(message: String, cause: Throwable) {

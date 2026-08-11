@@ -3,7 +3,7 @@
 package vip.cdms.drsticker.rule.adapters
 
 import kotlinx.serialization.Serializable
-import vip.cdms.drsticker.rule.preprocess.StickerFile
+import java.io.File
 
 @Serializable
 sealed interface RulesetAdapter
@@ -14,5 +14,5 @@ sealed interface AdapterResult {
 }
 
 interface AdapterHandler<C : RulesetAdapter> {
-    suspend fun send(config: C, sticker: StickerFile): AdapterResult
+    suspend fun send(config: C, file: File): AdapterResult
 }

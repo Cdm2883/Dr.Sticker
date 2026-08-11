@@ -20,8 +20,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import vip.cdms.drsticker.rule.preprocess.StickerFile
+import vip.cdms.drsticker.rule.utils.getMimeTypeFromExtension
 import vip.cdms.drsticker.utils.evalExpr
+import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -41,7 +42,7 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
     private var dropOverlay: DropOverlayWindow? = null
 
     @Suppress("UnnecessaryVariable")
-    final override suspend fun send(config: C, sticker: StickerFile): AdapterResult =
+    final override suspend fun send(config: C, file: File): AdapterResult =
         withContext(Dispatchers.Main.immediate) {
             check(Settings.canDrawOverlays(context)) { "Overlay permission is not granted." }
             check(dropOverlay == null) { "A drop overlay is already active." }
@@ -56,7 +57,7 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
             val sourceCenterX = targetX
             val sourceCenterY = targetY + config.overlayOffsetYPx
             val window = createDropOverlay(
-                sticker = sticker,
+                file = file,
                 sizePx = config.overlaySizePx,
                 centerX = sourceCenterX,
                 centerY = sourceCenterY,
@@ -90,7 +91,7 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
 
     @SuppressLint("ClickableViewAccessibility")
     private fun createDropOverlay(
-        sticker: StickerFile,
+        file: File,
         sizePx: Int,
         centerX: Int,
         centerY: Int,
@@ -98,7 +99,7 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
         val contentUri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
-            sticker.file,
+            file,
         )
         val view = ImageView(context).apply {
             setImageDrawable(0x00000000.toDrawable())
@@ -115,7 +116,8 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
             x = centerX - sizePx / 2
             y = centerY - sizePx / 2
         }
-        view.setOnTouchListener(DragTouchHandler(view, contentUri, sticker.mimeType))
+        val mimeType = file.extension.getMimeTypeFromExtension()
+        view.setOnTouchListener(DragTouchHandler(view, contentUri, mimeType))
         windowManager.addView(view, params)
         return DropOverlayWindow(view)
     }
@@ -161,12 +163,10 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
 
     class EmptyDragShadowBuilder : View.DragShadowBuilder() {
         override fun onProvideShadowMetrics(outShadowSize: Point, outShadowTouchPoint: Point) {
-            outShadowSize.set(1, 1) // 尺寸设为最小值
+            outShadowSize.set(1, 1)
             outShadowTouchPoint.set(0, 0)
         }
 
-        override fun onDrawShadow(canvas: Canvas) {
-            // 不绘制任何内容
-        }
+        override fun onDrawShadow(canvas: Canvas) {}
     }
 }

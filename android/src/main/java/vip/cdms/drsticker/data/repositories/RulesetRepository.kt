@@ -12,6 +12,7 @@ import vip.cdms.drsticker.rule.conditions.RulesetCondition
 import vip.cdms.drsticker.rule.preprocess.*
 import vip.cdms.drsticker.rule.triggers.RulesetTrigger
 import vip.cdms.drsticker.rule.triggers.TriggerHandler
+import java.io.File
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,25 +74,24 @@ class RulesetRepository @Inject constructor(
         storageConstants.getRulesetConfigFile(rulesetId).delete()
     }
 
-    fun getPreprocessCache(key: PreprocessCacheKey): StickerFile? {
+    fun getPreprocessCache(key: PreprocessCacheKey): File? {
         val hash = key.toHash()
-        val cacheFile = storageConstants.getPreprocessCacheFile(hash)
-            .takeIf { it.isFile && it.length() > 0 } ?: return null
-        val mimeType = storageConstants.getPreprocessCacheMimeTypeTextFile(hash)
+        val extension = storageConstants.getPreprocessCacheExtensionFile(hash)
             .takeIf { it.isFile }
-            ?.runCatching { readText().trim() }
-            ?.getOrNull()
-            ?.takeIf { it.isNotEmpty() } ?: return null
-        return StickerFile(cacheFile, mimeType)
+            ?.readText() ?: return null
+        return storageConstants.getPreprocessCacheFile(hash, extension)
+            .takeIf { it.isFile && it.length() > 0 }
     }
 
-    fun updatePreprocessCache(key: PreprocessCacheKey, stickerFile: StickerFile) {
+    fun updatePreprocessCache(key: PreprocessCacheKey, sticker: ProcessingSticker): File {
         val hash = key.toHash()
-        val cacheFile = storageConstants.getPreprocessCacheFile(hash)
-        val mimeTypeFile = storageConstants.getPreprocessCacheMimeTypeTextFile(hash)
-        mimeTypeFile.delete()
-        stickerFile.file.copyTo(cacheFile, overwrite = true)
-        mimeTypeFile.writeText(stickerFile.mimeType)
+        val cacheFile = storageConstants.getPreprocessCacheFile(hash, sticker.extension)
+        val extensionFile = storageConstants.getPreprocessCacheExtensionFile(hash)
+        extensionFile.delete()
+        cacheFile.delete()
+        cacheFile.writeBytes(sticker.bytes)
+        extensionFile.writeText(sticker.extension)
+        return cacheFile
     }
 
     @Suppress("UNCHECKED_CAST")
