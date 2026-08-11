@@ -67,10 +67,12 @@ interface StickerSourceDownloader
 interface StickerSourceConfig
 
 @Serializable
+@SerialName(SourceEnvConfigField.FIELD_SERIAL_NAME)
 sealed interface SourceEnvConfigField<T> {
     val value: T
 
     companion object {
+        const val FIELD_SERIAL_NAME = "SourceEnvConfigField"
         const val ENVIRONMENT_KEY = "@ENVIRONMENT@"
         const val OVERRIDE_KEY = "@OVERRIDE@"
     }
@@ -138,7 +140,7 @@ class StickerSourceConfigSerializer<T : StickerSourceConfig>(
     }
 
     private fun SerialDescriptor.isEnvConfigField() =
-        serialName.contains(SourceEnvConfigField::class.simpleName!!)
+        serialName == SourceEnvConfigField.FIELD_SERIAL_NAME
 
     private fun getEnv(jsonFieldName: String) =
         stickerRepositoryProvider.get().getStickerSourceEnv(sourceKey, jsonFieldName)
