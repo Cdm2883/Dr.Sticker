@@ -137,7 +137,6 @@ private fun StickerPickerSheetContent(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val rowState = rememberLazyListState()
     val gridState = rememberLazyGridState()
-    // FIXME: restoring the first sticker set header anchor to the wrong grid item.
     LaunchedEffect(state.indexEntries) {
         val anchor = viewModel.getSavedGridAnchor()
         if (anchor == null) {
@@ -149,9 +148,10 @@ private fun StickerPickerSheetContent(
                 viewModel.state.value.gridItemIndex(anchor.key)
                     ?: viewModel.state.value.gridItemIndex(gridHeaderKey(anchor.setId))
             } else null
-            if (itemIndex == null) {
+            if (itemIndex == null || (itemIndex == 0 && anchor.scrollOffset == 0)) {
                 rowState.scrollToItem(0)
                 gridState.scrollToItem(0)
+                gridState.animateScrollToItem(0)
             } else {
                 snapshotFlow { gridState.layoutInfo.totalItemsCount > itemIndex }
                     .first { it }
