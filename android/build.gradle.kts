@@ -42,6 +42,7 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
+        aidl = true
     }
     packaging {
         resources {
@@ -87,8 +88,10 @@ dependencies {
     implementation(libs.ereza.customactivityoncrash)
     implementation(libs.mt.data.files.provider)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.lsposed.hiddenapibypass)
     implementation(libs.rikka.shizuku.api)
     implementation(libs.rikka.shizuku.provider)
+    compileOnly(projects.androidHiddenApi)
     implementation(libs.square.okhttp3)
     implementation(libs.coil.compose)
     implementation(libs.calvin.reorderable)

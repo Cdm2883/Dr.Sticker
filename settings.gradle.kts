@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DrSticker"
 include(":android")
+include(":android-hidden-api")

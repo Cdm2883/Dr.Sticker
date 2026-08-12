@@ -12,6 +12,12 @@ WIP
 
 ## 🎈 Open Source
 
+### Credits
+
+- [gkd-kit/gkd](https://github.com/gkd-kit/gkd) - Referenced for the Shizuku gesture injection implementation.
+
+### License
+
 This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).  
 Please refer to the [LICENSE](./LICENSE) file for full details.
 

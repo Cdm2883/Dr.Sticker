@@ -7,6 +7,11 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import vip.cdms.drsticker.data.repositories.RulesetRepository
+import vip.cdms.drsticker.rule.adapters.AccessibilityDropAdapter
+import vip.cdms.drsticker.rule.adapters.ShizukuDropAdapter
+import vip.cdms.drsticker.services.utils.*
+import vip.cdms.drsticker.utils.vibrate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,6 +26,7 @@ sealed interface StickerServiceState {
 @Singleton
 class StickerServiceController @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val rulesetRepository: RulesetRepository,
 ) {
     private companion object {
         const val PREFERENCES_NAME = "sticker_service"
@@ -51,6 +57,7 @@ class StickerServiceController @Inject constructor(
         if (_state.value !is StickerServiceState.Stopped
             && _state.value !is StickerServiceState.Failed
         ) return
+        if (!ensurePermissionsGranted()) return
 
         _state.value = StickerServiceState.Starting
         try {
@@ -77,6 +84,34 @@ class StickerServiceController @Inject constructor(
         } catch (cause: Throwable) {
             _state.value = StickerServiceState.Failed(cause)
         }
+    }
+
+    private fun ensurePermissionsGranted(): Boolean {
+        if (!ensureOverlayPermissionGranted(context)) return false
+
+        val rulesets = rulesetRepository.getRulesetIndexes()
+            .map { rulesetRepository.getRuleset(it.rulesetId) }
+
+        var needsAccessibility = rulesets
+            .any { it.adapter is AccessibilityDropAdapter }
+        var needsShizuku = rulesets
+            .any { it.adapter is ShizukuDropAdapter }
+
+        // condition system
+        val useShizukuConditionFirst = true
+        if (!isShizukuInstalled(context))
+            needsAccessibility = true
+        else if (!needsAccessibility && useShizukuConditionFirst)
+            needsShizuku = true
+
+        if (needsShizuku) {
+            if (!isShizukuInstalled(context))
+                return false.also { vibrate(context) }
+            if (!hasShizukuPermission())
+                return false.also { requestShizukuPermission(context) }
+        }
+        return !(needsAccessibility
+                && !ensureAccessibilityEnabled(context))
     }
 
 

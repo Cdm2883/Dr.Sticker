@@ -3,7 +3,6 @@ package vip.cdms.drsticker.services
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -38,7 +37,14 @@ class ConditionContext @Inject constructor(
 
         this.packageName = packageName
         this.activityName = className
-        Log.i("ConditionContext", "packageName = $packageName; activityName = $activityName;")
+        return true
+    }
+
+    internal fun update(packageName: String?, activityName: String?): Boolean {
+        val pkg = packageName ?: return false
+        if (pkg == selfPackageName || pkg == "android") return false
+        this.packageName = pkg
+        this.activityName = activityName
         return true
     }
 

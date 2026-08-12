@@ -17,6 +17,7 @@ import vip.cdms.drsticker.rule.preprocess.PreprocessCacheKey
 import vip.cdms.drsticker.rule.preprocess.ProcessingSticker
 import vip.cdms.drsticker.rule.triggers.TriggerSession
 import vip.cdms.drsticker.services.picker.StickerPickerSheetController
+import vip.cdms.drsticker.services.shizuku.ShizukuBridge
 import java.io.File
 import javax.inject.Inject
 
@@ -30,6 +31,9 @@ class StickerService : Service() {
 
     @Inject
     lateinit var accessibilityBridge: AccessibilityBridge
+
+    @Inject
+    lateinit var shizukuBridge: ShizukuBridge
 
     @Inject
     lateinit var rulesetRepository: RulesetRepository
@@ -89,14 +93,16 @@ class StickerService : Service() {
         activeTrigger = null
         activeRuleset = null
         stickerPickerSheetController.hide()
-        accessibilityBridge.setConditionConsumer(
-            if (rulesets.isEmpty()) null else ::matchRuleset
-        )
+        val consumer = if (rulesets.isEmpty()) null else ::matchRuleset
+        val useShizuku = shizukuBridge.isAvailable()
+        shizukuBridge.setConditionConsumer(if (useShizuku) consumer else null)
+        accessibilityBridge.setConditionConsumer(if (useShizuku) null else consumer)
     }
 
     override fun onDestroy() {
         started = false
         accessibilityBridge.setConditionConsumer(null)
+        shizukuBridge.setConditionConsumer(null)
         activeTrigger?.close()
         activeTrigger = null
         activeRuleset = null
