@@ -4,6 +4,8 @@
         <item name="windowSplashScreenBackground">#3f6836</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="postSplashScreenTheme">@style/Theme.DrSticker</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
     </style>
 
     <style name="Theme.DrSticker.SplashScreen.Crash" parent="Theme.DrSticker.SplashScreen">
