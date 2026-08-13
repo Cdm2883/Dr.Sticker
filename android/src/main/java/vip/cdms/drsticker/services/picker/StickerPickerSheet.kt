@@ -1,5 +1,6 @@
 package vip.cdms.drsticker.services.picker
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
@@ -78,6 +79,10 @@ internal fun StickerPickerSheet(
             expandedHeightPx,
             tween(250, easing = FastOutSlowInEasing),
         )
+    }
+
+    BackHandler {
+        if (sheetHeight.value > collapsedHeightPx) collapse() else dismiss()
     }
 
     val currentHeightPx = sheetHeight.value

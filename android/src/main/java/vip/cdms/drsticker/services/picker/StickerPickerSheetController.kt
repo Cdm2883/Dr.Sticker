@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.provider.Settings
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.WindowManager
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -54,9 +56,19 @@ class StickerPickerSheetController @Inject constructor(
             onClose = ::hide,
         )
         val view = ComposeView(context).apply {
+            setOnKeyListener { _, keyCode, event ->
+                if (keyCode != KeyEvent.KEYCODE_BACK) return@setOnKeyListener false
+                if (event.action == KeyEvent.ACTION_UP) {
+                    owner.onBackPressedDispatcher.onBackPressed()
+                }
+                true
+            }
+            isFocusableInTouchMode = true
+            requestFocus()
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
             setViewTreeViewModelStoreOwner(owner)
+            setViewTreeOnBackPressedDispatcherOwner(owner)
             setContent {
                 AppTheme {
                     StickerPickerSheet(model)
