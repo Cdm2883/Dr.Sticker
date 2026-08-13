@@ -5,8 +5,11 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import vip.cdms.drsticker.data.repositories.RulesetRepository
 import vip.cdms.drsticker.rule.adapters.AccessibilityDropAdapter
 import vip.cdms.drsticker.rule.adapters.ShizukuDropAdapter
@@ -84,6 +87,11 @@ class StickerServiceController @Inject constructor(
         } catch (cause: Throwable) {
             _state.value = StickerServiceState.Failed(cause)
         }
+    }
+
+    internal fun autoStart() {
+        if (isSettingsEnabled) CoroutineScope(Dispatchers.IO)
+            .launch { start() }
     }
 
     private fun ensurePermissionsGranted(): Boolean {

@@ -35,10 +35,11 @@ fun hasShizukuPermission() = try {
     false
 }
 
-fun requestShizukuPermission(context: Context, requestCode: Int = 1001) {
-    if (!Shizuku.shouldShowRequestPermissionRationale())
+fun requestShizukuPermission(context: Context, requestCode: Int = 1001) = runCatching {
+    if (!Shizuku.pingBinder() || Shizuku.shouldShowRequestPermissionRationale())
+        vibrate(context)
+    else
         Shizuku.requestPermission(requestCode)
-    else vibrate(context)
 }
 
 

@@ -14,15 +14,6 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        if (!stickerServiceController.isSettingsEnabled) return
-        try {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, StickerService::class.java)
-                    .setAction(StickerService.ACTION_START),
-            )
-        } catch (_: Throwable) {
-            runCatching {stickerServiceController.isSettingsEnabled = false }
-        }
+        stickerServiceController.autoStart()
     }
 }
