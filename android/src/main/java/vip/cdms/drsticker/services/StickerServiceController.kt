@@ -89,6 +89,19 @@ class StickerServiceController @Inject constructor(
         }
     }
 
+    @Synchronized
+    fun restartIfRunning() {
+        if (_state.value !is StickerServiceState.Running) return
+
+        try {
+            val intent = Intent(context, StickerService::class.java)
+                .setAction(StickerService.ACTION_RESTART)
+            context.startService(intent)
+        } catch (cause: Throwable) {
+            _state.value = StickerServiceState.Failed(cause)
+        }
+    }
+
     internal fun autoStart() {
         if (isSettingsEnabled) CoroutineScope(Dispatchers.IO)
             .launch { start() }

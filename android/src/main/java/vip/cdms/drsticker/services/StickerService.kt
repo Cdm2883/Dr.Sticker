@@ -62,6 +62,16 @@ class StickerService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_RESTART) {
+            if (!started) return START_STICKY
+            return try {
+                refresh()
+                START_STICKY
+            } catch (cause: Throwable) {
+                fail("Failed to restart sticker service.", cause)
+                START_NOT_STICKY
+            }
+        }
         if (!serviceController.isSettingsEnabled) {
             stopSelf()
             return START_NOT_STICKY
@@ -78,7 +88,7 @@ class StickerService : Service() {
             serviceController.reportRunning()
             START_STICKY
         } catch (cause: Throwable) {
-            fail("Failed to start sticker runtime.", cause)
+            fail("Failed to start sticker service.", cause)
             START_NOT_STICKY
         }
     }
@@ -186,15 +196,19 @@ class StickerService : Service() {
         { rulesetRepository.getPreprocessCache(cacheKey) }?.let { return it }
 
         val initial = ProcessingSticker(original.readBytes(), originalExtension)
-        val processed = ruleset.preprocesses
-            .fold(initial) { input, config ->
-                rulesetRepository
-                    .getPreprocessHandler(config)
-                    .process(config, input)
+        var processed = initial
+        for (config in ruleset.preprocesses) {
+            val output = rulesetRepository
+                .getPreprocessHandler(config)
+                .process(config, processed)
+            if (output == null) {
+                if (processed === initial) return original
+                break
             }
+            processed = output
+        }
         return withContext(Dispatchers.IO) {
-            rulesetRepository
-                .updatePreprocessCache(cacheKey, processed)
+            rulesetRepository.updatePreprocessCache(cacheKey, processed)
         }
     }
 
@@ -213,5 +227,6 @@ class StickerService : Service() {
         private const val TAG = "StickerService"
         const val ACTION_START = "vip.cdms.drsticker.action.START"
         const val ACTION_STOP = "vip.cdms.drsticker.action.STOP"
+        const val ACTION_RESTART = "vip.cdms.drsticker.action.RESTART"
     }
 }

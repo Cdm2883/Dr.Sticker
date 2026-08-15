@@ -35,6 +35,7 @@ import vip.cdms.drsticker.data.*
 import vip.cdms.drsticker.ui.components.*
 import vip.cdms.drsticker.ui.models.*
 import vip.cdms.drsticker.ui.theme.darkTheme
+import vip.cdms.drsticker.ui.utils.readableMessage
 import vip.cdms.drsticker.ui.utils.rememberDisabledTopOverscrollEffect
 import vip.cdms.drsticker.ui.utils.thenIf
 import vip.cdms.drsticker.utils.vibrate
@@ -149,16 +150,13 @@ fun StickerSetsPage(
                             onRemove = { viewModel.remove(index) },
                         )
 
-                    if (entry !is StickerSetListEntry.StickerSet)
-                        throw IllegalStateException()
-
                     val hasDividerAbove = index == 0
                             || state.entries[index - 1] is StickerSetListEntry.Divider
                     val hasDividerBelow = index == state.entries.lastIndex
                             || state.entries[index + 1] is StickerSetListEntry.Divider
                     var pendingDividerIndex by remember { mutableStateOf<Int?>(null) }
                     StickerListItem(
-                        entry = entry,
+                        entry = entry as StickerSetListEntry.StickerSet,
                         modifier = with(sharedTransitionScope) {
                             Modifier.sharedBounds(
                                 rememberSharedContentState(key = "bound_" + entry.setId),
@@ -297,7 +295,15 @@ private fun ReorderableCollectionItemScope.StickerListItem(
             maxLines = if (entry.description == null) 2 else 1,
         )
     },
-    supportingContent = entry.description?.let { { Text(it, modifierDescription) } },
+    supportingContent = entry.description?.let {
+        {
+            Text(
+                it,
+                modifier = modifierDescription.basicMarquee(),
+                maxLines = 1,
+            )
+        }
+    },
     trailingContent = {
         var menuExpanded by remember { mutableStateOf(false) }
         IconButton(
@@ -704,6 +710,3 @@ private fun StickerSetConfigDialog(
         }
     }
 }
-
-private fun Throwable.readableMessage() =
-    message?.takeIf { it.isNotBlank() } ?: this::class.simpleName ?: "Unknown error"

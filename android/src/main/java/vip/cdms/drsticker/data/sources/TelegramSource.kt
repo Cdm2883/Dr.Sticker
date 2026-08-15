@@ -40,7 +40,7 @@ class TelegramSourceMetadata @Inject constructor(
     setSerializer = SourceStickerSet.serializer(TelegramStickerResource.serializer()),
 ) {
     override val displayName get() = "Telegram"  // context.getString(R.string.)
-    override val description get() = "Get telegram sticker set via Bot API"
+    override val description get() = "Get Telegram sticker set via Bot API."
 
     @Composable
     override fun SourceConfigScope<TelegramSourceConfig>.Settings() {
@@ -77,10 +77,12 @@ class TelegramSourceMetadata @Inject constructor(
                             .substringAfter("addstickers/")
                             .substringBefore("?")
                             .substringBefore("/")
+
                         "set=" in input -> input  // tg://addstickers?set=<NAME>
                             .substringAfter("set=")
                             .substringBefore("&")
                             .substringBefore("/")
+
                         else -> input.removePrefix("@")
                     }
                 },
@@ -102,7 +104,6 @@ data class TelegramStickerResource(
     override val extension: String,
 ) : SourceStickerResource
 
-@Suppress("PropertyName")
 class TelegramSourceHandler @Inject constructor(
     private val httpClient: OkHttpClient,
     private val json: Json,
@@ -111,10 +112,10 @@ class TelegramSourceHandler @Inject constructor(
     data class RawResponse<T>(val result: T)
 
     @Serializable
-    data class RawFile(val file_path: String)
+    data class RawFile(@SerialName("file_path") val filePath: String)
 
     @Serializable
-    private data class RawPhotoSize(val file_id: String)
+    private data class RawPhotoSize(@SerialName("file_id") val fileId: String)
 
     @Serializable
     private data class RawStickerSet(
@@ -127,15 +128,15 @@ class TelegramSourceHandler @Inject constructor(
     private data class RawSticker(
         val emoji: String?,
         val thumbnail: RawPhotoSize?,
-        val file_id: String,
-        val is_animated: Boolean,
-        val is_video: Boolean,
+        @SerialName("file_id") val fileId: String,
+        @SerialName("is_animated") val isAnimated: Boolean,
+        @SerialName("is_video") val isVideo: Boolean,
     ) {
         fun toResource() = TelegramStickerResource(
-            fileId = file_id,
+            fileId = fileId,
             extension = when {
-                is_animated -> "tgs"
-                is_video -> "webm"
+                isAnimated -> "tgs"
+                isVideo -> "webm"
                 else -> "webp"
             }
         )
@@ -150,15 +151,15 @@ class TelegramSourceHandler @Inject constructor(
             json.decodeFromString<RawResponse<RawStickerSet>>(httpClient.fetchAsString(getStickerSetUrl)).result
 
         suspend fun RawPhotoSize.toResource() = TelegramStickerResource(
-            fileId = file_id,
+            fileId = fileId,
             extension = SourceStickerResource
-                .thumbnailExtension(fetchFileExtension(config.botToken.value, file_id)),
+                .thumbnailExtension(fetchFileExtension(config.botToken.value, fileId)),
         )
 
         val stickers = rawStickerSet.stickers.map {
             async {
                 SourceSticker(
-                    stickerId = it.file_id,
+                    stickerId = it.fileId,
                     tags = listOfNotNull(it.emoji),
                     thumbnail = it.thumbnail?.toResource(),
                     resource = it.toResource()
@@ -178,7 +179,7 @@ class TelegramSourceHandler @Inject constructor(
         rateLimiter.wait()
         val url = "https://api.telegram.org/bot$botToken/getFile?file_id=$fileId"
         val file = json.decodeFromString<RawResponse<RawFile>>(httpClient.fetchAsString(url)).result
-        return file.file_path.substringAfterLast('.', "")
+        return file.filePath.substringAfterLast('.', "")
     }
 }
 
@@ -195,7 +196,7 @@ class TelegramStickerDownloader @Inject constructor(
         val getFileUrl = "https://api.telegram.org/bot$botToken/getFile?file_id=${resource.fileId}"
         rateLimiter.wait()
         val filePath = json.decodeFromString<RawResponse<RawFile>>(httpClient.fetchAsString(getFileUrl))
-            .result.file_path
+            .result.filePath
 
         val downloadUrl = "https://api.telegram.org/file/bot$botToken/$filePath"
         rateLimiter.wait()
@@ -209,7 +210,7 @@ interface TelegramSourceModule {
     @Binds
     @IntoMap
     @StringKey(SOURCE_KEY)
-    fun bindMetadata(factory: TelegramSourceMetadata): StickerSourceMetadata<*>
+    fun bindMetadata(metadata: TelegramSourceMetadata): StickerSourceMetadata<*>
 
     @Binds
     @IntoMap

@@ -19,7 +19,7 @@ class ProcessingSticker(
 @Serializable
 sealed interface RulesetPreprocess
 interface PreprocessHandler<C : RulesetPreprocess> {
-    suspend fun process(config: C, input: ProcessingSticker): ProcessingSticker
+    suspend fun process(config: C, input: ProcessingSticker): ProcessingSticker?
 }
 
 

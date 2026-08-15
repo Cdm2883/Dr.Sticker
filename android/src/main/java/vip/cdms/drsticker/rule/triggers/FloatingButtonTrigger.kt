@@ -10,6 +10,17 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -19,6 +30,7 @@ import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 import kotlinx.serialization.Serializable
 import vip.cdms.drsticker.R
+import vip.cdms.drsticker.rule.RulesetTriggerMetadata
 import vip.cdms.drsticker.utils.evalExpr
 import javax.inject.Inject
 import kotlin.math.abs
@@ -30,6 +42,55 @@ data class FloatingButtonTrigger(
     val centerYExpression: String = $$"$screenHeight * 0.8",
     val sizeDp: Float = 40f,
 ) : RulesetTrigger
+
+class FloatingButtonTriggerMetadata @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+) : RulesetTriggerMetadata<FloatingButtonTrigger> {
+    override val displayName get() = "Floating button"  // context.getString(R.string.)
+    override val description get() = "Open the sticker picker from a movable floating button."
+
+    override fun createDefault() = FloatingButtonTrigger()
+
+    @Composable
+    override fun Editor(
+        config: FloatingButtonTrigger,
+        onConfigChanged: (FloatingButtonTrigger) -> Unit,
+    ) {
+        OutlinedTextField(
+            value = config.centerXExpression,
+            onValueChange = { onConfigChanged(config.copy(centerXExpression = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Initial center X") },
+            supportingText = { Text($$"Variables: $screenWidth, $screenHeight") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = config.centerYExpression,
+            onValueChange = { onConfigChanged(config.copy(centerYExpression = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Initial center Y") },
+            supportingText = { Text($$"Variables: $screenWidth, $screenHeight") },
+            singleLine = true,
+        )
+
+        var sizeText by remember { mutableStateOf(config.sizeDp.toString()) }
+        val size = sizeText.toFloatOrNull()
+        OutlinedTextField(
+            value = sizeText,
+            onValueChange = { updated ->
+                sizeText = updated
+                updated.toFloatOrNull()
+                    ?.takeIf { it.isFinite() && it > 0f }
+                    ?.let { onConfigChanged(config.copy(sizeDp = it)) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Button size (dp)") },
+            isError = size == null || !size.isFinite() || size <= 0f,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+        )
+    }
+}
 
 class FloatingButtonTriggerHandler @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -150,6 +211,11 @@ class FloatingButtonTriggerHandler @Inject constructor(
 @Module
 @InstallIn(SingletonComponent::class)
 interface FloatingButtonTriggerModule {
+    @Binds
+    @IntoMap
+    @ClassKey(FloatingButtonTrigger::class)
+    fun bindMetadata(metadata: FloatingButtonTriggerMetadata): RulesetTriggerMetadata<*>
+
     @Binds
     @IntoMap
     @ClassKey(FloatingButtonTrigger::class)

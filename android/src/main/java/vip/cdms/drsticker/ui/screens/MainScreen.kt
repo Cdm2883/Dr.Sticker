@@ -17,16 +17,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import vip.cdms.drsticker.services.StickerServiceState
 import vip.cdms.drsticker.ui.components.AboutBottomSheet
 import vip.cdms.drsticker.ui.models.MainScreenModel
@@ -45,7 +43,8 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
     val scrollToHideBottomBarState = rememberScrollToHideBottomBarState(initialHeight = 80.dp)
     LaunchedEffect(currentDestination) {
 //        scrollToHideBottomBarState.reset()
-        if (isRootDestination) scrollToHideBottomBarState.unlockAndShow()
+        if (isRootDestination || currentDestination?.hasRoute<RulesetAddRoute>() == true)
+            scrollToHideBottomBarState.unlockAndShow()
         else scrollToHideBottomBarState.lockAndHide()
     }
 
@@ -121,16 +120,29 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
                     popExitTransition = navBarExitTransition
                 ) {
                     RulesetsPage(
-                        onRulesetDetail = { navController.navigate(RulesetDetailRoute(it)) },
+                        onAddRuleset = { navController.navigate(RulesetAddRoute()) },
+                        onEditRuleset = { navController.navigate(RulesetEditRoute(it)) },
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = this@composable,
                     )
                 }
-                composable<RulesetDetailRoute> {
+                composable<RulesetEditRoute> {
                     RulesetDetail(
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = this@composable,
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                dialog<RulesetAddRoute>(
+                    dialogProperties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                        dismissOnBackPress = false,
+                        dismissOnClickOutside = false,
+                    ),
+                ) {
+                    RulesetAddDialog(
+                        onDismissed = { navController.popBackStack() },
                     )
                 }
             }
@@ -151,7 +163,7 @@ private fun MainFloatingActionButton(
 
     val items = listOf(
         Icons.Rounded.Layers to "Open Sheet" to viewModel::openPickerSheet,
-        Icons.Rounded.ImportExport to "Import / Export" to { TODO() },
+        Icons.Rounded.Settings to "Settings" to { TODO() },
         Icons.Rounded.Info to "About" to onClickAbout,
     )
 

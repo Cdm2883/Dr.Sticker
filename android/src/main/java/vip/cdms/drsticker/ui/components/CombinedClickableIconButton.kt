@@ -19,18 +19,17 @@ fun CombinedClickableIconButton(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     content: @Composable (BoxScope.() -> Unit)
-) {
-    Box(
-        modifier = Modifier
-            .minimumInteractiveComponentSize()
-            .size(IconButtonDefaults.smallContainerSize())
-            .clip(IconButtonDefaults.standardShape)
-            .then(modifier)
-            .combinedClickable(
-                onLongClick = onLongClick,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-        content = content
-    )
-}
+) = Box(
+    modifier = Modifier
+        .minimumInteractiveComponentSize()
+        .size(IconButtonDefaults.smallContainerSize())
+        .clip(IconButtonDefaults.standardShape)
+        .then(modifier)
+        .combinedClickable(
+            onLongClick = onLongClick,
+            onClick = onClick,
+        ),
+    contentAlignment = Alignment.Center,
+    content = content
+)
+

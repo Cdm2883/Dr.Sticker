@@ -14,12 +14,24 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toDrawable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import vip.cdms.drsticker.rule.RulesetAdapterMetadata
 import vip.cdms.drsticker.rule.utils.getMimeTypeFromExtension
 import vip.cdms.drsticker.utils.evalExpr
 import java.io.File
@@ -33,6 +45,80 @@ sealed interface BaseDropAdapter : RulesetAdapter {
     val overlaySizePx: Int
     val gestureDelayMillis: Long
     val overlayOffsetYPx: Int
+}
+
+interface BaseDropAdapterMetadata<C : BaseDropAdapter> : RulesetAdapterMetadata<C> {
+    @Composable
+    fun CommonEditor(
+        config: C,
+        onDragTargetXExpressionChange: (String) -> Unit,
+        onDragTargetYExpressionChange: (String) -> Unit,
+        onOverlaySizePxChange: (Int) -> Unit,
+        onGestureDelayMillisChange: (Long) -> Unit,
+        onOverlayOffsetYPxChange: (Int) -> Unit,
+    ) {
+        OutlinedTextField(
+            value = config.dragTargetXExpression,
+            onValueChange = onDragTargetXExpressionChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Drop target X") },
+            supportingText = { Text($$"Variables: $screenWidth, $screenHeight") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = config.dragTargetYExpression,
+            onValueChange = onDragTargetYExpressionChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Drop target Y") },
+            supportingText = { Text($$"Variables: $screenWidth, $screenHeight") },
+            singleLine = true,
+        )
+
+        var overlaySizeText by remember { mutableStateOf(config.overlaySizePx.toString()) }
+        val overlaySize = overlaySizeText.toIntOrNull()
+        OutlinedTextField(
+            value = overlaySizeText,
+            onValueChange = { text ->
+                overlaySizeText = text
+                text.toIntOrNull()?.takeIf { it > 0 }?.let(onOverlaySizePxChange)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Drag overlay size (px)") },
+            isError = overlaySize == null || overlaySize <= 0,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+        )
+
+        var gestureDelayText by remember { mutableStateOf(config.gestureDelayMillis.toString()) }
+        val gestureDelay = gestureDelayText.toLongOrNull()
+        OutlinedTextField(
+            value = gestureDelayText,
+            onValueChange = { text ->
+                gestureDelayText = text
+                text.toLongOrNull()?.takeIf { it >= 0L }?.let(onGestureDelayMillisChange)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Delay before drag (ms)") },
+            isError = gestureDelay == null || gestureDelay < 0L,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+        )
+
+        var overlayOffsetText by remember { mutableStateOf(config.overlayOffsetYPx.toString()) }
+        val overlayOffset = overlayOffsetText.toIntOrNull()
+        OutlinedTextField(
+            value = overlayOffsetText,
+            onValueChange = { text ->
+                overlayOffsetText = text
+                text.toIntOrNull()?.let(onOverlayOffsetYPxChange)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Drag start Y offset (px)") },
+            isError = overlayOffset == null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            singleLine = true,
+        )
+    }
 }
 
 abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(

@@ -487,7 +487,7 @@ private fun StickerGrid(
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(5),
-        contentPadding = PaddingValues(12.dp),
+        contentPadding = PaddingValues(12.dp) + PaddingValues(bottom = 6.dp + 8.dp * 22),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxSize(),

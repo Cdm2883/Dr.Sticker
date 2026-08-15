@@ -27,18 +27,10 @@ class Not(val child: RulesetCondition) : RulesetCondition {
 
 @Serializable
 class AllOf(val children: List<RulesetCondition>) : RulesetCondition {
-    init {
-        require(children.isNotEmpty()) { "AllOf requires at least one child." }
-    }
-
     override fun matches(context: ConditionContext) = children.all { it.matches(context) }
 }
 
 @Serializable
 class AnyOf(val children: List<RulesetCondition>) : RulesetCondition {
-    init {
-        require(children.isNotEmpty()) { "AnyOf requires at least one child." }
-    }
-
     override fun matches(context: ConditionContext) = children.any { it.matches(context) }
 }

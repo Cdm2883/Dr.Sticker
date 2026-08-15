@@ -3,6 +3,13 @@ package vip.cdms.drsticker.rule.adapters
 import android.accessibilityservice.GestureDescription
 import android.content.Context
 import android.graphics.Path
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -11,6 +18,7 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 import kotlinx.serialization.Serializable
+import vip.cdms.drsticker.rule.RulesetAdapterMetadata
 import vip.cdms.drsticker.services.AccessibilityBridge
 import vip.cdms.drsticker.services.AccessibilityBridge.GestureResult
 import javax.inject.Inject
@@ -27,6 +35,79 @@ data class AccessibilityDropAdapter(
     override val gestureDelayMillis: Long = 50L,
     override val overlayOffsetYPx: Int = -200,
 ) : BaseDropAdapter
+
+class AccessibilityDropAdapterMetadata @Inject constructor(
+    @param:ApplicationContext private val context: Context
+) : BaseDropAdapterMetadata<AccessibilityDropAdapter> {
+    override val displayName get() = "Drag & Drop (Accessibility)"  // context.getString(R.string.)
+    override val description get() = "Drop stickers with Android accessibility gestures."
+
+    override fun createDefault() = AccessibilityDropAdapter()
+
+    @Composable
+    override fun Editor(
+        config: AccessibilityDropAdapter,
+        onConfigChanged: (AccessibilityDropAdapter) -> Unit,
+    ) {
+        var slowFirstText by remember { mutableStateOf(config.slowFirstPx.toString()) }
+        val slowFirst = slowFirstText.toIntOrNull()
+        OutlinedTextField(
+            value = slowFirstText,
+            onValueChange = { text ->
+                slowFirstText = text
+                text.toIntOrNull()?.takeIf { it >= 0 }
+                    ?.let { onConfigChanged(config.copy(slowFirstPx = it)) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Slow initial distance (px)") },
+            isError = slowFirst == null || slowFirst < 0,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+        )
+
+        var slowDurationText by remember { mutableStateOf(config.slowDurationMillis.toString()) }
+        val slowDuration = slowDurationText.toLongOrNull()
+        OutlinedTextField(
+            value = slowDurationText,
+            onValueChange = { text ->
+                slowDurationText = text
+                text.toLongOrNull()?.takeIf { it > 0L }
+                    ?.let { onConfigChanged(config.copy(slowDurationMillis = it)) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Slow initial duration (ms)") },
+            isError = slowDuration == null || slowDuration <= 0L,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+        )
+
+        var fastDurationText by remember { mutableStateOf(config.fastDurationMillis.toString()) }
+        val fastDuration = fastDurationText.toLongOrNull()
+        OutlinedTextField(
+            value = fastDurationText,
+            onValueChange = { text ->
+                fastDurationText = text
+                text.toLongOrNull()?.takeIf { it > 0L }
+                    ?.let { onConfigChanged(config.copy(fastDurationMillis = it)) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Remaining drag duration (ms)") },
+            isError = fastDuration == null || fastDuration <= 0L,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+        )
+
+        @Suppress("DuplicatedCode")
+        CommonEditor(
+            config = config,
+            onDragTargetXExpressionChange = { onConfigChanged(config.copy(dragTargetXExpression = it)) },
+            onDragTargetYExpressionChange = { onConfigChanged(config.copy(dragTargetYExpression = it)) },
+            onOverlaySizePxChange = { onConfigChanged(config.copy(overlaySizePx = it)) },
+            onGestureDelayMillisChange = { onConfigChanged(config.copy(gestureDelayMillis = it)) },
+            onOverlayOffsetYPxChange = { onConfigChanged(config.copy(overlayOffsetYPx = it)) },
+        )
+    }
+}
 
 class AccessibilityDropAdapterHandler @Inject constructor(
     @ApplicationContext context: Context,
@@ -87,6 +168,11 @@ class AccessibilityDropAdapterHandler @Inject constructor(
 @Module
 @InstallIn(SingletonComponent::class)
 interface AccessibilityDropAdapterModule {
+    @Binds
+    @IntoMap
+    @ClassKey(AccessibilityDropAdapter::class)
+    fun bindMetadata(metadata: AccessibilityDropAdapterMetadata): RulesetAdapterMetadata<*>
+
     @Binds
     @IntoMap
     @ClassKey(AccessibilityDropAdapter::class)

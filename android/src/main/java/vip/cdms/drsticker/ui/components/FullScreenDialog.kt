@@ -100,22 +100,29 @@ fun FullScreenOverlay(
             dismissOnClickOutside = false,
         )
     ) {
-        val view = LocalView.current
-        val isDarkTheme = MaterialTheme.darkTheme
-        SideEffect {
-            val window = (view.parent as? DialogWindowProvider)?.window
-            if (window != null) {
-                window.setDimAmount(0.4f)
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.isAppearanceLightStatusBars = !isDarkTheme
-                insetsController.isAppearanceLightNavigationBars = !isDarkTheme
-            }
-        }
+        ApplyFullScreenDialogWindowStyle()
         AnimatedVisibility(
             visibleState = transitionState,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
             content = content
         )
+    }
+}
+
+@Composable
+internal fun ApplyFullScreenDialogWindowStyle(
+    dimAmount: Float = 0.4f
+) {
+    val view = LocalView.current
+    val isDarkTheme = MaterialTheme.darkTheme
+    SideEffect {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        if (window != null) {
+            window.setDimAmount(dimAmount)
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDarkTheme
+            insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+        }
     }
 }
