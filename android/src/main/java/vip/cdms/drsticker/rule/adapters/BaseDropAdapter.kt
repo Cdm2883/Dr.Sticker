@@ -3,33 +3,34 @@ package vip.cdms.drsticker.rule.adapters
 import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipDescription
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.PixelFormat
 import android.graphics.Point
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toDrawable
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import vip.cdms.drsticker.rule.RulesetAdapterMetadata
 import vip.cdms.drsticker.rule.utils.getMimeTypeFromExtension
@@ -37,6 +38,7 @@ import vip.cdms.drsticker.utils.evalExpr
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 sealed interface BaseDropAdapter : RulesetAdapter {
@@ -45,9 +47,11 @@ sealed interface BaseDropAdapter : RulesetAdapter {
     val overlaySizePx: Int
     val gestureDelayMillis: Long
     val overlayOffsetYPx: Int
+    val useMediaStore: Boolean
 }
 
 interface BaseDropAdapterMetadata<C : BaseDropAdapter> : RulesetAdapterMetadata<C> {
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     @Composable
     fun CommonEditor(
         config: C,
@@ -56,6 +60,7 @@ interface BaseDropAdapterMetadata<C : BaseDropAdapter> : RulesetAdapterMetadata<
         onOverlaySizePxChange: (Int) -> Unit,
         onGestureDelayMillisChange: (Long) -> Unit,
         onOverlayOffsetYPxChange: (Int) -> Unit,
+        onUseMediaStoreChange: (Boolean) -> Unit,
     ) {
         OutlinedTextField(
             value = config.dragTargetXExpression,
@@ -118,6 +123,21 @@ interface BaseDropAdapterMetadata<C : BaseDropAdapter> : RulesetAdapterMetadata<
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             singleLine = true,
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "MediaStore compatibility",
+                style = MaterialTheme.typography.bodyLargeEmphasized,
+            )
+            Switch(
+                checked = config.useMediaStore,
+                onCheckedChange = onUseMediaStoreChange,
+            )
+        }
     }
 }
 
@@ -126,12 +146,29 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
 ) : AdapterHandler<C> {
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var dropOverlay: DropOverlayWindow? = null
+    private var isSending = false
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Suppress("UnnecessaryVariable")
-    final override suspend fun send(config: C, file: File): AdapterResult =
-        withContext(Dispatchers.Main.immediate) {
-            check(Settings.canDrawOverlays(context)) { "Overlay permission is not granted." }
-            check(dropOverlay == null) { "A drop overlay is already active." }
+    final override suspend fun send(config: C, file: File) = withContext(Dispatchers.Main.immediate) {
+        check(Settings.canDrawOverlays(context)) { "Overlay permission is not granted." }
+        check(!isSending) { "A sticker handoff is already active." }
+        isSending = true
+
+        var window: DropOverlayWindow? = null
+        var temporaryMediaUri: Uri? = null
+        try {
+            val mimeType = file.extension.getMimeTypeFromExtension()
+            val contentUri = if (config.useMediaStore)
+                withContext(Dispatchers.IO) {
+                    createMediaStoreUri(file, mimeType).also { temporaryMediaUri = it }
+                }
+            else
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
 
             val metrics = context.resources.displayMetrics
             val variables = mapOf(
@@ -142,28 +179,30 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
             val targetY = config.dragTargetYExpression.evalExpr(variables).roundToInt()
             val sourceCenterX = targetX
             val sourceCenterY = targetY + config.overlayOffsetYPx
-            val window = createDropOverlay(
-                file = file,
+            window = createDropOverlay(
+                contentUri = contentUri,
+                mimeType = mimeType,
                 sizePx = config.overlaySizePx,
                 centerX = sourceCenterX,
                 centerY = sourceCenterY,
             )
             dropOverlay = window
-            try {
-                @Suppress("ConvertLongToDuration")
-                delay(config.gestureDelayMillis)
-                performDragGesture(
-                    config = config,
-                    startX = sourceCenterX,
-                    startY = sourceCenterY,
-                    endX = targetX,
-                    endY = targetY,
-                )
-            } finally {
-                if (dropOverlay === window) dropOverlay = null
-                if (window.view.isAttachedToWindow) windowManager.removeView(window.view)
-            }
+            @Suppress("ConvertLongToDuration")
+            delay(config.gestureDelayMillis)
+            performDragGesture(
+                config = config,
+                startX = sourceCenterX,
+                startY = sourceCenterY,
+                endX = targetX,
+                endY = targetY,
+            )
+        } finally {
+            if (dropOverlay === window) dropOverlay = null
+            isSending = false
+            temporaryMediaUri?.let(::scheduleMediaStoreDeletion)
+            window?.view?.takeIf { it.isAttachedToWindow }?.let(windowManager::removeView)
         }
+    }
 
     protected abstract suspend fun performDragGesture(
         config: C,
@@ -171,22 +210,66 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
         startY: Int,
         endX: Int,
         endY: Int,
-    ): AdapterResult
+    )
 
     private class DropOverlayWindow(val view: View)
 
+    private fun createMediaStoreUri(file: File, mimeType: String): Uri {
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            "MediaStore requires Android 10 or newer."
+        }
+        val resolver = context.contentResolver
+        val extension = file.extension.takeIf(String::isNotBlank)?.let { ".$it" }.orEmpty()
+        val (collection, relativePath) = when {
+            mimeType.startsWith("image/") -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI to
+                    "${Environment.DIRECTORY_PICTURES}/Dr.Sticker/.drop"
+
+            mimeType.startsWith("video/") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI to
+                    "${Environment.DIRECTORY_MOVIES}/Dr.Sticker/.drop"
+
+            else -> error("Unsupported MediaStore MIME type: $mimeType")
+        }
+        val values = ContentValues().apply {
+            put(
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                "drsticker_drop_${System.currentTimeMillis()}$extension",
+            )
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(collection, values)
+            ?: error("Failed to create MediaStore item.")
+        try {
+            resolver.openOutputStream(uri, "w")?.use { output ->
+                file.inputStream().use { input -> input.copyTo(output) }
+            } ?: error("Failed to open MediaStore item for writing.")
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            check(resolver.update(uri, values, null, null) == 1) {
+                "Failed to publish MediaStore item."
+            }
+            return uri
+        } catch (cause: Throwable) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw cause
+        }
+    }
+
+    private fun scheduleMediaStoreDeletion(uri: Uri) = cleanupScope.launch {
+        delay(MEDIA_STORE_RETENTION)
+        runCatching { context.contentResolver.delete(uri, null, null) }
+            .onFailure { Log.w(TAG, "Failed to delete temporary MediaStore item.", it) }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun createDropOverlay(
-        file: File,
+        contentUri: Uri,
+        mimeType: String,
         sizePx: Int,
         centerX: Int,
         centerY: Int,
     ): DropOverlayWindow {
-        val contentUri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
         val view = ImageView(context).apply {
             setImageDrawable(0x00000000.toDrawable())
         }
@@ -202,7 +285,6 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
             x = centerX - sizePx / 2
             y = centerY - sizePx / 2
         }
-        val mimeType = file.extension.getMimeTypeFromExtension()
         view.setOnTouchListener(DragTouchHandler(view, contentUri, mimeType))
         windowManager.addView(view, params)
         return DropOverlayWindow(view)
@@ -254,5 +336,10 @@ abstract class BaseDropAdapterHandler<C : BaseDropAdapter>(
         }
 
         override fun onDrawShadow(canvas: Canvas) {}
+    }
+
+    private companion object {
+        const val TAG = "BaseDropAdapter"
+        val MEDIA_STORE_RETENTION = 3.seconds
     }
 }

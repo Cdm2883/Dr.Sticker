@@ -34,6 +34,7 @@ data class AccessibilityDropAdapter(
     override val overlaySizePx: Int = 160,
     override val gestureDelayMillis: Long = 50L,
     override val overlayOffsetYPx: Int = -200,
+    override val useMediaStore: Boolean = false,
 ) : BaseDropAdapter
 
 class AccessibilityDropAdapterMetadata @Inject constructor(
@@ -105,6 +106,7 @@ class AccessibilityDropAdapterMetadata @Inject constructor(
             onOverlaySizePxChange = { onConfigChanged(config.copy(overlaySizePx = it)) },
             onGestureDelayMillisChange = { onConfigChanged(config.copy(gestureDelayMillis = it)) },
             onOverlayOffsetYPxChange = { onConfigChanged(config.copy(overlayOffsetYPx = it)) },
+            onUseMediaStoreChange = { onConfigChanged(config.copy(useMediaStore = it)) },
         )
     }
 }
@@ -119,7 +121,7 @@ class AccessibilityDropAdapterHandler @Inject constructor(
         startY: Int,
         endX: Int,
         endY: Int,
-    ): AdapterResult {
+    ) {
         val totalX = endX - startX
         val totalY = endY - startY
         val totalDistance = hypot(totalX.toDouble(), totalY.toDouble())
@@ -153,14 +155,14 @@ class AccessibilityDropAdapterHandler @Inject constructor(
                     false,
                 )
                 when (accessibilityBridge.dispatchGesture(secondStroke)) {
-                    GestureResult.Completed -> AdapterResult.Completed
-                    GestureResult.Cancelled -> AdapterResult.Failed("Accessibility fast gesture was cancelled.")
-                    GestureResult.Unavailable -> AdapterResult.Failed("Accessibility fast gesture is unavailable.")
+                    GestureResult.Completed -> Unit
+                    GestureResult.Cancelled -> error("Accessibility fast gesture was cancelled.")
+                    GestureResult.Unavailable -> error("Accessibility fast gesture is unavailable.")
                 }
             }
 
-            GestureResult.Cancelled -> AdapterResult.Failed("Accessibility slow gesture was cancelled.")
-            GestureResult.Unavailable -> AdapterResult.Failed("Accessibility slow gesture is unavailable.")
+            GestureResult.Cancelled -> error("Accessibility slow gesture was cancelled.")
+            GestureResult.Unavailable -> error("Accessibility slow gesture is unavailable.")
         }
     }
 }

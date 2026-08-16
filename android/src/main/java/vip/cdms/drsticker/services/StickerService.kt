@@ -12,7 +12,6 @@ import vip.cdms.drsticker.data.repositories.RulesetRepository
 import vip.cdms.drsticker.data.repositories.StatisticRepository
 import vip.cdms.drsticker.data.repositories.StickerRepository
 import vip.cdms.drsticker.rule.Ruleset
-import vip.cdms.drsticker.rule.adapters.AdapterResult
 import vip.cdms.drsticker.rule.preprocess.PreprocessCacheKey
 import vip.cdms.drsticker.rule.preprocess.ProcessingSticker
 import vip.cdms.drsticker.rule.triggers.TriggerSession
@@ -164,18 +163,11 @@ class StickerService : Service() {
             setId, stickerId, ruleset,
             original, resource.getRealExtension()
         )
-        when (val result = rulesetRepository.getAdapterHandler(ruleset.adapter)
-            .send(ruleset.adapter, processed)) {
-            AdapterResult.Completed -> {
-                withContext(Dispatchers.IO)
-                { statisticRepository.trackStickerUsage(setId, stickerId) }
-                Log.i(TAG, "Sticker handoff completed.")
-            }
-
-            is AdapterResult.Failed -> Log.w(
-                TAG, "Sticker handoff failed: ${result.reason}"
-            )
-        }
+        rulesetRepository
+            .getAdapterHandler(ruleset.adapter)
+            .send(ruleset.adapter, processed)
+        withContext(Dispatchers.IO) { statisticRepository.trackStickerUsage(setId, stickerId) }
+        Log.i(TAG, "Sticker handoff completed.")
         Unit
     } catch (cause: Throwable) {
         Log.e(TAG, "Failed to hand off sticker '$stickerId' from set '$setId'.", cause)

@@ -28,6 +28,7 @@ data class ShizukuDropAdapter(
     override val overlaySizePx: Int = 160,
     override val gestureDelayMillis: Long = 50,
     override val overlayOffsetYPx: Int = -200,
+    override val useMediaStore: Boolean = false,
 ) : BaseDropAdapter
 
 class ShizukuDropAdapterMetadata @Inject constructor(
@@ -67,6 +68,7 @@ class ShizukuDropAdapterMetadata @Inject constructor(
             onOverlaySizePxChange = { onConfigChanged(config.copy(overlaySizePx = it)) },
             onGestureDelayMillisChange = { onConfigChanged(config.copy(gestureDelayMillis = it)) },
             onOverlayOffsetYPxChange = { onConfigChanged(config.copy(overlayOffsetYPx = it)) },
+            onUseMediaStoreChange = { onConfigChanged(config.copy(useMediaStore = it)) },
         )
     }
 }
@@ -81,10 +83,9 @@ class ShizukuDropAdapterHandler @Inject constructor(
         startY: Int,
         endX: Int,
         endY: Int,
-    ): AdapterResult {
+    ) {
         val ok = shizukuBridge.swipe(startX, startY, endX, endY, config.gestureDurationMillis)
-        return if (ok) AdapterResult.Completed
-        else AdapterResult.Failed("Shizuku swipe failed or is unavailable.")
+        if (!ok) error("Shizuku swipe failed or is unavailable.")
     }
 }
 
