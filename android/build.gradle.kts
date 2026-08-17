@@ -29,6 +29,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "De.Sticker")
+            resValue("color", "ic_launcher_background_color", "#865319")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

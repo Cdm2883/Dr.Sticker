@@ -21,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -117,11 +119,10 @@ class FloatingButtonTriggerHandler @Inject constructor(
         val centerY = config.centerYExpression.evalExpr(variables).roundToInt()
         val view = ImageButton(context).apply {
             setImageResource(R.drawable.ic_drsticker)
-            val paddingPx = (sizePx * 0.2f).toInt()
-            setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
+            val backgroundColor = ContextCompat.getColor(context, R.color.ic_launcher_background_color)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(0xCC3F6836.toInt())
+                setColor(ColorUtils.setAlphaComponent(backgroundColor, (255 * 0.8f).toInt()))
             }
         }
         val params = WindowManager.LayoutParams(
