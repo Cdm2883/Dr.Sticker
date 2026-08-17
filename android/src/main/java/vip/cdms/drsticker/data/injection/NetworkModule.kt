@@ -1,7 +1,9 @@
 package vip.cdms.drsticker.data.injection
 
 import android.content.Context
+import android.os.Build
 import coil.ImageLoader
+import coil.decode.ImageDecoderDecoder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,6 +29,10 @@ object NetworkModule {
         stickerSourceFetcherFactory: StickerSourceFetcherFactory
     ) = ImageLoader.Builder(context)
         .callFactory(httpClient)
-        .components { add(stickerSourceFetcherFactory) }
+        .components {
+            add(stickerSourceFetcherFactory)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                add(ImageDecoderDecoder.Factory())
+        }
         .build()
 }

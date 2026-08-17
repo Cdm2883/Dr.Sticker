@@ -99,5 +99,6 @@ dependencies {
     compileOnly(projects.androidHiddenApi)
     implementation(libs.square.okhttp3)
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     implementation(libs.calvin.reorderable)
 }
