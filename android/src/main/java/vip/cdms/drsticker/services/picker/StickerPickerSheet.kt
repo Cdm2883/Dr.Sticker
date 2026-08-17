@@ -465,7 +465,7 @@ private fun StickerGrid(
                 it is StickerPickerIndexEntry.StickerSet && it.setId == setId
             }
             if (index >= 0 && rowState.firstVisibleItemIndex != index) {
-                rowState.animateScrollToItem(index)
+                launch { rowState.animateScrollToItem(index) }
             }
         }
     }
