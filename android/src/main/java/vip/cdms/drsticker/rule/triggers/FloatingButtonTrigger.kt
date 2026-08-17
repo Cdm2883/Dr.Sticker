@@ -11,15 +11,11 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
@@ -35,6 +31,7 @@ import vip.cdms.drsticker.R
 import vip.cdms.drsticker.rule.RulesetTriggerMetadata
 import vip.cdms.drsticker.utils.evalExpr
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -94,6 +91,7 @@ class FloatingButtonTriggerMetadata @Inject constructor(
     }
 }
 
+@Singleton
 class FloatingButtonTriggerHandler @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : TriggerHandler<FloatingButtonTrigger> {
@@ -102,12 +100,13 @@ class FloatingButtonTriggerHandler @Inject constructor(
 
     private data class FloatingButtonWindow(val view: View)
 
+    @Synchronized
     override fun activate(
         config: FloatingButtonTrigger,
         onOpenPicker: () -> Unit
     ): TriggerSession {
         check(Settings.canDrawOverlays(context)) { "Overlay permission is not granted." }
-        closeActiveWindow()
+        activeWindow?.let(::closeWindow)
 
         val metrics = context.resources.displayMetrics
         val variables = mapOf(
@@ -138,16 +137,16 @@ class FloatingButtonTriggerHandler @Inject constructor(
             y = centerY - sizePx / 2
         }
         installTouchHandler(view, params, onOpenPicker)
-        windowManager.addView(view, params)
         val window = FloatingButtonWindow(view)
         activeWindow = window
-
-        return TriggerSession {
-            if (activeWindow === window) {
-                activeWindow = null
-                removeView(window.view)
-            }
+        try {
+            windowManager.addView(view, params)
+        } catch (cause: Throwable) {
+            closeWindow(window)
+            throw cause
         }
+
+        return TriggerSession { closeWindow(window) }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -198,14 +197,13 @@ class FloatingButtonTriggerHandler @Inject constructor(
         }
     }
 
-    private fun closeActiveWindow() {
-        val window = activeWindow ?: return
-        activeWindow = null
-        removeView(window.view)
-    }
-
-    private fun removeView(view: View) {
-        if (view.isAttachedToWindow) windowManager.removeView(view)
+    @Synchronized
+    private fun closeWindow(window: FloatingButtonWindow) {
+        if (activeWindow === window) activeWindow = null
+        try {
+            windowManager.removeViewImmediate(window.view)
+        } catch (_: IllegalArgumentException) {
+        }
     }
 }
 

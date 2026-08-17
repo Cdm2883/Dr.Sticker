@@ -109,6 +109,7 @@ class StickerServiceController @Inject constructor(
 
     private fun ensurePermissionsGranted(): Boolean {
         if (!ensureOverlayPermissionGranted(context)) return false
+        if (!ensureBatteryOptimizationExemptionGranted(context)) return false
 
         val rulesets = rulesetRepository.getRulesetIndexes()
             .map { rulesetRepository.getRuleset(it.rulesetId) }

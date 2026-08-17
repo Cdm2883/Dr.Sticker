@@ -1,8 +1,10 @@
 package vip.cdms.drsticker.services.utils
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.net.toUri
 import rikka.shizuku.Shizuku
@@ -12,6 +14,10 @@ import vip.cdms.drsticker.utils.vibrate
 fun ensureOverlayPermissionGranted(context: Context) =
     isOverlayPermissionGranted(context)
         .also { if (!it) requestOverlayPermission(context) }
+
+fun ensureBatteryOptimizationExemptionGranted(context: Context) =
+    isBatteryOptimizationExemptionGranted(context)
+        .also { if (!it) requestBatteryOptimizationExemption(context) }
 
 fun ensureAccessibilityEnabled(
     context: Context,
@@ -50,6 +56,21 @@ private fun requestOverlayPermission(context: Context) {
     val intent = Intent(
         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
         "package:${context.packageName}".toUri()
+    ).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+}
+
+private fun isBatteryOptimizationExemptionGranted(context: Context) =
+    context.getSystemService(PowerManager::class.java)
+        .isIgnoringBatteryOptimizations(context.packageName)
+
+@SuppressLint("BatteryLife")
+private fun requestBatteryOptimizationExemption(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+        "package:${context.packageName}".toUri(),
     ).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
