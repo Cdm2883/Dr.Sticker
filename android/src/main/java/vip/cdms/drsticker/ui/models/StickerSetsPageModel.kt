@@ -23,7 +23,7 @@ data class StickersPageState(
     val isManualSorting: Boolean = false,
     val entries: List<StickerSetListEntry> = emptyList(),
     val pickerState: StickerSetPickerState = StickerSetPickerState.Closed,
-    val configState: StickerSetConfigState = StickerSetConfigState.Closed,
+    val configState: StickerSetConfigState = StickerSetConfigState.Closed(),
 )
 
 sealed interface StickerSetPickerState {
@@ -48,7 +48,10 @@ sealed interface StickerSetConfigSaveState {
 }
 
 sealed interface StickerSetConfigState {
-    data object Closed : StickerSetConfigState
+    data class Closed(
+        val scrollToSetId: StickerSetId? = null,
+    ) : StickerSetConfigState
+
     data class Add(
         val sourceKey: String,
         val envProvider: SourceEnvValueProvider,
@@ -289,7 +292,17 @@ class StickerSetsPageModel @Inject constructor(
         check(it.configState.saveStateOrNull() !is StickerSetConfigSaveState.Saving) {
             "Cannot close sticker set config while saving."
         }
-        it.copy(configState = StickerSetConfigState.Closed)
+        it.copy(configState = StickerSetConfigState.Closed())
+    }
+
+    fun consumeScrollToStickerSet() = _state.update { state ->
+        if (state.configState is StickerSetConfigState.Closed &&
+            state.configState.scrollToSetId != null
+        ) {
+            state.copy(configState = StickerSetConfigState.Closed())
+        } else {
+            state
+        }
     }
 
     fun addStickerSet(
@@ -339,7 +352,9 @@ class StickerSetsPageModel @Inject constructor(
                     _state.update {
                         it.copy(
                             entries = entries,
-                            configState = StickerSetConfigState.Closed,
+                            configState = StickerSetConfigState.Closed(
+                                scrollToSetId = if (target is StickerSetConfigState.Add) setId else null,
+                            ),
                         )
                     }
                 }
@@ -359,13 +374,13 @@ class StickerSetsPageModel @Inject constructor(
     private fun StickerSetConfigState.saveStateOrNull() = when (this) {
         is StickerSetConfigState.Add -> saveState
         is StickerSetConfigState.Edit -> saveState
-        StickerSetConfigState.Closed -> null
+        is StickerSetConfigState.Closed -> null
     }
 
     private fun StickerSetConfigState.withSaveState(saveState: StickerSetConfigSaveState) = when (this) {
         is StickerSetConfigState.Add -> copy(saveState = saveState)
         is StickerSetConfigState.Edit -> copy(saveState = saveState)
-        StickerSetConfigState.Closed -> error("Sticker set config is not open.")
+        is StickerSetConfigState.Closed -> error("Sticker set config is not open.")
     }
 
     private fun getPageEntries() =

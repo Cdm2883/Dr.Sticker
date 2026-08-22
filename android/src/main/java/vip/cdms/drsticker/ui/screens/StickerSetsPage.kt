@@ -37,6 +37,7 @@ import vip.cdms.drsticker.data.utils.ProgressableSnapshot
 import vip.cdms.drsticker.ui.components.*
 import vip.cdms.drsticker.ui.models.*
 import vip.cdms.drsticker.ui.theme.darkTheme
+import vip.cdms.drsticker.ui.utils.negativePadding
 import vip.cdms.drsticker.ui.utils.readableMessage
 import vip.cdms.drsticker.ui.utils.rememberDisabledTopOverscrollEffect
 import vip.cdms.drsticker.ui.utils.thenIf
@@ -59,6 +60,20 @@ fun StickerSetsPage(
     val lazyListState = rememberLazyListState()
     val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
         viewModel.move(from.index, to.index)
+    }
+
+    LaunchedEffect(state.configState) {
+        val closedState = state.configState as? StickerSetConfigState.Closed
+        val setId = closedState?.scrollToSetId ?: return@LaunchedEffect
+        val index = state.entries.indexOfFirst { entry ->
+            when (entry) {
+                is StickerSetListEntry.StickerSet -> entry.setId == setId
+                is StickerSetListEntry.LoadError -> entry.setId == setId
+                is StickerSetListEntry.Divider -> false
+            }
+        }
+        if (index >= 0) lazyListState.animateScrollToItem(index)
+        viewModel.consumeScrollToStickerSet()
     }
 
     BackHandler(enabled = state.isManualSorting) {
@@ -293,6 +308,7 @@ private fun ReorderableCollectionItemScope.StickerListItem(
         Text(
             entry.displayName,
             modifier = modifierTitle
+                .negativePadding(end = 12.dp)
                 .thenIf(entry.description == null) { padding(bottom = 6.dp) }
                 .thenIf(entry.description != null) { basicMarquee() },
             lineHeight = 1.2.em,
@@ -303,7 +319,9 @@ private fun ReorderableCollectionItemScope.StickerListItem(
         {
             Text(
                 it,
-                modifier = modifierDescription.basicMarquee(),
+                modifier = modifierDescription
+                    .negativePadding(end = 12.dp)
+                    .basicMarquee(),
                 maxLines = 1,
             )
         }
@@ -316,6 +334,7 @@ private fun ReorderableCollectionItemScope.StickerListItem(
                 menuExpanded = true
             },
             modifier = Modifier
+                .offset(x = 12.dp)
                 .then(if (isSorting) Modifier.draggableHandle() else Modifier),
         ) {
             Icon(
@@ -365,11 +384,15 @@ private fun ReorderableCollectionItemScope.StickerLoadErrorListItem(
     headlineContent = {
         Text(
             text = "Unable to load sticker set: ${entry.setId}",
+            modifier = Modifier.negativePadding(end = 12.dp),
             color = MaterialTheme.colorScheme.error,
         )
     },
     supportingContent = {
-        Text(entry.error.readableMessage())
+        Text(
+            entry.error.readableMessage(),
+            modifier = Modifier.negativePadding(end = 12.dp),
+        )
     },
     trailingContent = {
         IconButton(
@@ -378,6 +401,7 @@ private fun ReorderableCollectionItemScope.StickerLoadErrorListItem(
                 onRemove()
             },
             modifier = Modifier
+                .offset(x = 12.dp)
                 .then(if (isSorting) Modifier.draggableHandle() else Modifier),
         ) {
             Icon(
@@ -455,7 +479,10 @@ private fun PickStickerSetDialog(
             }
 
             val detachedEntries = openState?.detachedEntries.orEmpty()
-            if (detachedEntries.isNotEmpty()) item {
+            if (detachedEntries
+                    .filterNot { it.key in hiddenDetachedIds }
+                    .isNotEmpty()
+            ) item {
                 Text(
                     "From cache",
                     modifier = Modifier.padding(horizontal = 20.dp).padding(top = 8.dp),
@@ -585,7 +612,7 @@ private fun StickerSetConfigDialog(
     val formKey = when (state) {  // compose key
         is StickerSetConfigState.Add -> "add:${state.sourceKey}"
         is StickerSetConfigState.Edit -> "edit:${state.setId}"
-        StickerSetConfigState.Closed -> null
+        is StickerSetConfigState.Closed -> null
     }
 
     val addState = state as? StickerSetConfigState.Add
@@ -607,7 +634,7 @@ private fun StickerSetConfigDialog(
     val saveState = when (state) {
         is StickerSetConfigState.Add -> state.saveState
         is StickerSetConfigState.Edit -> state.saveState
-        StickerSetConfigState.Closed -> StickerSetConfigSaveState.Idle
+        is StickerSetConfigState.Closed -> StickerSetConfigSaveState.Idle
     }
 
     FullScreenDialog(
