@@ -17,14 +17,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.compose.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import vip.cdms.drsticker.services.StickerServiceState
 import vip.cdms.drsticker.ui.components.AboutBottomSheet
 import vip.cdms.drsticker.ui.models.MainScreenModel
@@ -43,8 +45,7 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
     val scrollToHideBottomBarState = rememberScrollToHideBottomBarState(initialHeight = 80.dp)
     LaunchedEffect(currentDestination) {
 //        scrollToHideBottomBarState.reset()
-        if (isRootDestination || currentDestination?.hasRoute<RulesetAddRoute>() == true)
-            scrollToHideBottomBarState.unlockAndShow()
+        if (isRootDestination) scrollToHideBottomBarState.unlockAndShow()
         else scrollToHideBottomBarState.lockAndHide()
     }
 
@@ -59,18 +60,14 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
         bottomBar = {
             MainNavigationBar(
                 navController = navController,
-                modifier = Modifier.offset {
-                    scrollToHideBottomBarState.bottomBarOffset
-                }
+                modifier = Modifier.offset { scrollToHideBottomBarState.bottomBarOffset }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             MainFloatingActionButton(
                 viewModel = viewModel,
-                modifier = Modifier.offset {
-                    scrollToHideBottomBarState.bottomBarOffset
-                },
+                modifier = Modifier.offset { scrollToHideBottomBarState.bottomBarOffset },
                 onClickAbout = { showAboutBottomSheet = true },
             )
         },
@@ -133,16 +130,16 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
                         onBack = { navController.popBackStack() },
                     )
                 }
-                dialog<RulesetAddRoute>(
-                    dialogProperties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                        decorFitsSystemWindows = false,
-                        dismissOnBackPress = false,
-                        dismissOnClickOutside = false,
-                    ),
+                composable<RulesetAddRoute>(
+                    enterTransition = { slideInVertically { it } },
+                    exitTransition = { slideOutVertically { it } },
+                    popEnterTransition = { slideInVertically { -it } },
+                    popExitTransition = { slideOutVertically { it } },
                 ) {
-                    RulesetAddDialog(
-                        onDismissed = { navController.popBackStack() },
+                    RulesetDetail(
+                        sharedTransitionScope = null,
+                        animatedVisibilityScope = null,
+                        onBack = { navController.popBackStack() },
                     )
                 }
             }

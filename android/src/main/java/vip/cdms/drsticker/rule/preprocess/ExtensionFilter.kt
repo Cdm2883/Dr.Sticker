@@ -1,15 +1,18 @@
 package vip.cdms.drsticker.rule.preprocess
 
 import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dagger.Binds
 import dagger.Module
@@ -60,22 +63,36 @@ class ExtensionFilterMetadata @Inject constructor(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Extensions") },
             supportingText = { Text("Separate extensions with commas") },
-            singleLine = true,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Switch(
-                checked = config.passOnMatch,
-                onCheckedChange = {
-                    onConfigChanged(config.copy(passOnMatch = it))
-                },
-            )
-            Text(
-                if (config.passOnMatch) "Continue on match" else "Stop on match",
-            )
+        Column {
+            listOf(
+                true to "Continue on match",
+                false to "Stop on match",
+            ).forEach { (value, label) ->
+                val isSelected = config.passOnMatch == value
+                Row(
+                    Modifier.fillMaxWidth()
+                        .height(40.dp)
+                        .selectable(
+                            selected = isSelected,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onConfigChanged(config.copy(passOnMatch = value)) },
+                            role = Role.RadioButton,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = null,
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(start = 16.dp),
+                    )
+                }
+            }
         }
     }
 }

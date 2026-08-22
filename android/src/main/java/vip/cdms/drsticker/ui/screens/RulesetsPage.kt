@@ -5,10 +5,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,6 +33,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import vip.cdms.drsticker.rule.RulesetId
 import vip.cdms.drsticker.ui.models.RulesetListEntry
 import vip.cdms.drsticker.ui.models.RulesetsPageModel
+import vip.cdms.drsticker.ui.utils.negativePadding
 import vip.cdms.drsticker.ui.utils.readableMessage
 import vip.cdms.drsticker.ui.utils.rememberDisabledTopOverscrollEffect
 
@@ -198,12 +196,30 @@ private fun ReorderableCollectionItemScope.RulesetListItem(
 ) = ListItem(
     modifier = modifier
         .clickable(onClick = onClick),
-    headlineContent = { Text(entry.displayName, modifier = modifierTitle) },
-    supportingContent = entry.description?.let { { Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis) } },
+    headlineContent = {
+        Text(
+            entry.displayName,
+            modifier = modifierTitle
+                .negativePadding(end = 12.dp),
+        )
+    },
+    supportingContent = entry.description?.let {
+        {
+            Text(
+                it,
+                modifier = Modifier
+                    .negativePadding(end = 12.dp),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    },
     trailingContent = {
         if (isSorting) IconButton(
             onClick = {},
-            modifier = Modifier.draggableHandle(),
+            modifier = Modifier
+                .offset(x = 12.dp)
+                .draggableHandle(),
         ) {
             Icon(
                 Icons.Rounded.DragIndicator,
@@ -225,11 +241,15 @@ private fun ReorderableCollectionItemScope.RulesetLoadErrorListItem(
     headlineContent = {
         Text(
             text = "Unable to load ruleset: ${entry.rulesetId}",
+            modifier = Modifier.negativePadding(end = 12.dp),
             color = MaterialTheme.colorScheme.error,
         )
     },
     supportingContent = {
-        Text(entry.error.readableMessage())
+        Text(
+            entry.error.readableMessage(),
+            modifier = Modifier.negativePadding(end = 12.dp),
+        )
     },
     trailingContent = {
         var openDeleteDialog by remember { mutableStateOf(false) }
@@ -239,6 +259,7 @@ private fun ReorderableCollectionItemScope.RulesetLoadErrorListItem(
                 openDeleteDialog = true
             },
             modifier = Modifier
+                .offset(x = 12.dp)
                 .then(if (isSorting) Modifier.draggableHandle() else Modifier),
         ) {
             Icon(

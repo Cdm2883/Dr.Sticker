@@ -3,7 +3,6 @@ package vip.cdms.drsticker.ui.screens
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -32,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableItem
@@ -44,7 +42,6 @@ import vip.cdms.drsticker.rule.RulesetTriggerMetadata
 import vip.cdms.drsticker.rule.adapters.RulesetAdapter
 import vip.cdms.drsticker.rule.preprocess.RulesetPreprocess
 import vip.cdms.drsticker.rule.triggers.RulesetTrigger
-import vip.cdms.drsticker.ui.components.ApplyFullScreenDialogWindowStyle
 import vip.cdms.drsticker.ui.components.TwoRowsDropdownMenuItem
 import vip.cdms.drsticker.ui.models.RulesetConfigOption
 import vip.cdms.drsticker.ui.models.RulesetDetailModel
@@ -58,35 +55,6 @@ data class RulesetEditRoute(val rulesetId: RulesetId)
 
 @Serializable
 data class RulesetAddRoute(val rulesetId: RulesetId? = null)
-
-@Composable
-fun RulesetAddDialog(onDismissed: () -> Unit) {
-    var visible by remember { mutableStateOf(true) }
-    val transitionState = remember { MutableTransitionState(false) }
-    transitionState.targetState = visible
-    val requestDismiss = { visible = false }
-    LaunchedEffect(visible) {
-        if (!visible) {
-            snapshotFlow { transitionState.isIdle && !transitionState.currentState }
-                .first { it }
-            onDismissed()
-        }
-    }
-
-    ApplyFullScreenDialogWindowStyle()
-    BackHandler(enabled = visible, onBack = requestDismiss)
-    AnimatedVisibility(
-        visibleState = transitionState,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
-    ) {
-        RulesetDetail(
-            sharedTransitionScope = null,
-            animatedVisibilityScope = null,
-            onBack = requestDismiss,
-        )
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

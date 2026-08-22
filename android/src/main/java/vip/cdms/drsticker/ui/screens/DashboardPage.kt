@@ -16,9 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.times
 import kotlinx.serialization.Serializable
 import vip.cdms.drsticker.ui.theme.darkTheme
 import vip.cdms.drsticker.ui.utils.negativePadding
@@ -142,85 +144,95 @@ private fun ActivityCard(modifier: Modifier = Modifier) {
         }
     }
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(
-            modifier = Modifier.padding(end = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.Center) {} // Sunday
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.CenterStart) {
-                Text(
-                    "Mon",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = colorScheme.onSurfaceVariant,
-                    modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
-                )
-            }
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.Center) {} // Tuesday
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.CenterStart) {
-                Text(
-                    "Wed",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = colorScheme.onSurfaceVariant,
-                    modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
-                )
-            }
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.Center) {} // Thursday
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.CenterStart) {
-                Text(
-                    "Fri",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = colorScheme.onSurfaceVariant,
-                    modifier = Modifier.wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
-                )
-            }
-            Box(modifier = Modifier.height(10.dp), contentAlignment = Alignment.Center) {} // Saturday
+    val weekdayLabels = listOf(null, "Mon", null, "Wed", null, "Fri", null)
+
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val gridSpacing = 3.dp
+        val weekdayLabelSpacing = 6.dp
+        val weekdayLabelStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+        val textMeasurer = rememberTextMeasurer()
+        val weekdayLabelWidth = with(androidx.compose.ui.platform.LocalDensity.current) {
+            weekdayLabels.filterNotNull()
+                .maxOf { textMeasurer.measure(it, weekdayLabelStyle).size.width }
+                .toDp()
         }
+        val gridWidth = maxWidth - weekdayLabelWidth - weekdayLabelSpacing
+        val cellHeight = (gridWidth - 21 * gridSpacing) / 22
+        val gridHeight = cellHeight * 7 + gridSpacing * 6
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(gridHeight),
+            verticalAlignment = Alignment.Top,
         ) {
-            activityData.forEach { weekData ->
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    weekData.forEach { level ->
-                        val cellColor = remember(level, colorScheme) {
-                            when (level) {
-                                0 -> colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                1 -> colorScheme.primary.copy(alpha = 0.2f)
-                                2 -> colorScheme.primary.copy(alpha = 0.45f)
-                                3 -> colorScheme.primary.copy(alpha = 0.75f)
-                                else -> colorScheme.primary
-                            }
-                        }
-                        TooltipBox(
-                            positionProvider =
-                                TooltipDefaults.rememberTooltipPositionProvider(
-                                    TooltipAnchorPosition.Below
+            Column(
+                modifier = Modifier
+                    .width(weekdayLabelWidth + weekdayLabelSpacing)
+                    .padding(end = weekdayLabelSpacing),
+                verticalArrangement = Arrangement.spacedBy(gridSpacing),
+            ) {
+                repeat(7) { day ->
+                    Box(
+                        modifier = Modifier.height(cellHeight),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        weekdayLabels[day]?.let {
+                            Text(
+                                it,
+                                style = weekdayLabelStyle,
+                                color = colorScheme.onSurfaceVariant,
+                                modifier = Modifier.wrapContentHeight(
+                                    align = Alignment.CenterVertically,
+                                    unbounded = true,
                                 ),
-                            tooltip = {
-                                PlainTooltip(
-                                    caretShape = TooltipDefaults.caretShape()
-                                ) {
-                                    Text("1919/08/10 - 114514 times")
-                                }
-                            },
-                            state = rememberTooltipState(isPersistent = true),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(cellColor)
                             )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(gridSpacing),
+                modifier = Modifier.weight(1f),
+            ) {
+                activityData.forEach { weekData ->
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(gridSpacing),
+                    ) {
+                        weekData.forEach { level ->
+                            val cellColor = remember(level, colorScheme) {
+                                when (level) {
+                                    0 -> colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    1 -> colorScheme.primary.copy(alpha = 0.2f)
+                                    2 -> colorScheme.primary.copy(alpha = 0.45f)
+                                    3 -> colorScheme.primary.copy(alpha = 0.75f)
+                                    else -> colorScheme.primary
+                                }
+                            }
+                            TooltipBox(
+                                positionProvider =
+                                    TooltipDefaults.rememberTooltipPositionProvider(
+                                        TooltipAnchorPosition.Below
+                                    ),
+                                tooltip = {
+                                    PlainTooltip(
+                                        caretShape = TooltipDefaults.caretShape()
+                                    ) {
+                                        Text("1919/08/10 - 114514 times")
+                                    }
+                                },
+                                state = rememberTooltipState(isPersistent = true),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(cellHeight)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(cellColor)
+                                )
+                            }
                         }
                     }
                 }
