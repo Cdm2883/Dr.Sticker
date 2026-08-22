@@ -55,9 +55,9 @@ class StickerRepository @Inject constructor(
 
     suspend fun addStickerSet(source: StickerSourceConfig, overrides: StickerSetOverrides): StickerSetId {
         val rawSet = fetchSourceStickerSet(source)
-        var setId = rawSet.setId + "@" + getSourceMetadata(source).key
+        val setId = rawSet.setId + "@" + getSourceMetadata(source).key
         val indexes = getStickerSetIndexes().toMutableList()
-        if (indexes.contains(setId)) setId = setId + "_" + UUID.randomUUID().toString().take(7)
+        if (indexes.contains(setId)) error("Sticker set already exists.")
         setStickerSet(StickerSetConfig(setId, source, overrides))
         cacheSourceStickerSet(setId, source, rawSet)
         updateStickerSourceEnv(source)
