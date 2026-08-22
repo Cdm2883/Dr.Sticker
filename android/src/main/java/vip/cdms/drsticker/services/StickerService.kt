@@ -12,12 +12,9 @@ import vip.cdms.drsticker.data.repositories.RulesetRepository
 import vip.cdms.drsticker.data.repositories.StatisticRepository
 import vip.cdms.drsticker.data.repositories.StickerRepository
 import vip.cdms.drsticker.rule.Ruleset
-import vip.cdms.drsticker.rule.preprocess.PreprocessCacheKey
-import vip.cdms.drsticker.rule.preprocess.ProcessingSticker
 import vip.cdms.drsticker.rule.triggers.TriggerSession
 import vip.cdms.drsticker.services.picker.StickerPickerSheetController
 import vip.cdms.drsticker.services.shizuku.ShizukuBridge
-import java.io.File
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -93,11 +90,7 @@ class StickerService : Service() {
     }
 
     fun refresh() {
-        rulesets = rulesetRepository.getRulesetIndexes()
-            .asSequence()
-            .filter { it.isEnabled }
-            .map { rulesetRepository.getRuleset(it.rulesetId) }
-            .toList()
+        rulesets = rulesetRepository.getEnabledRulesets()
         activeTrigger?.close()
         activeTrigger = null
         activeRuleset = null
@@ -159,7 +152,7 @@ class StickerService : Service() {
         val ruleset = activeRuleset ?: return
         val original = withContext(Dispatchers.IO)
         { stickerRepository.fetchStickerResource(setId, stickerId, resource) }
-        val processed = preprocessSticker(
+        val processed = rulesetRepository.preprocessSticker(
             setId, stickerId, ruleset,
             original, resource.getRealExtension()
         )
@@ -172,36 +165,6 @@ class StickerService : Service() {
     } catch (cause: Throwable) {
         Log.e(TAG, "Failed to hand off sticker '$stickerId' from set '$setId'.", cause)
         Unit
-    }
-
-    private suspend fun preprocessSticker(
-        setId: StickerSetId,
-        stickerId: StickerId,
-        ruleset: Ruleset,
-        original: File,
-        originalExtension: String,
-    ): File {
-        if (ruleset.preprocesses.isEmpty()) return original
-
-        val cacheKey = PreprocessCacheKey(setId, stickerId, ruleset.preprocesses)
-        withContext(Dispatchers.IO)
-        { rulesetRepository.getPreprocessCache(cacheKey) }?.let { return it }
-
-        val initial = ProcessingSticker(original.readBytes(), originalExtension)
-        var processed = initial
-        for (config in ruleset.preprocesses) {
-            val output = rulesetRepository
-                .getPreprocessHandler(config)
-                .process(config, processed)
-            if (output == null) {
-                if (processed === initial) return original
-                break
-            }
-            processed = output
-        }
-        return withContext(Dispatchers.IO) {
-            rulesetRepository.updatePreprocessCache(cacheKey, processed)
-        }
     }
 
     private fun fail(message: String, cause: Throwable) {

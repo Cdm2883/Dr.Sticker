@@ -25,6 +25,7 @@ import vip.cdms.drsticker.data.sources.TelegramSourceHandler.RawResponse
 import vip.cdms.drsticker.data.utils.RateLimiter
 import vip.cdms.drsticker.data.utils.fetchAsString
 import vip.cdms.drsticker.data.utils.fetchToSink
+import vip.cdms.drsticker.data.utils.progressable
 import vip.cdms.drsticker.ui.components.AutoSourceConfigField
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -191,16 +192,18 @@ class TelegramStickerDownloader @Inject constructor(
         config: TelegramSourceConfig,
         resource: TelegramStickerResource,
         out: Sink
-    ) = withContext(Dispatchers.IO) {
-        val botToken = config.botToken.value
-        val getFileUrl = "https://api.telegram.org/bot$botToken/getFile?file_id=${resource.fileId}"
-        rateLimiter.wait()
-        val filePath = json.decodeFromString<RawResponse<RawFile>>(httpClient.fetchAsString(getFileUrl))
-            .result.filePath
+    ) = progressable {
+        withContext(Dispatchers.IO) {
+            val botToken = config.botToken.value
+            val getFileUrl = "https://api.telegram.org/bot$botToken/getFile?file_id=${resource.fileId}"
+            rateLimiter.wait()
+            val filePath = json.decodeFromString<RawResponse<RawFile>>(httpClient.fetchAsString(getFileUrl))
+                .result.filePath
 
-        val downloadUrl = "https://api.telegram.org/file/bot$botToken/$filePath"
-        rateLimiter.wait()
-        httpClient.fetchToSink(downloadUrl, out)
+            val downloadUrl = "https://api.telegram.org/file/bot$botToken/$filePath"
+            rateLimiter.wait()
+            httpClient.fetchToSink(downloadUrl, out)
+        }
     }
 }
 

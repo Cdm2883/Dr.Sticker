@@ -1,8 +1,13 @@
 package vip.cdms.drsticker.data.repositories
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import vip.cdms.drsticker.data.StickerId
+import vip.cdms.drsticker.data.StickerSetId
 import vip.cdms.drsticker.data.injection.RulesetConfigJson
 import vip.cdms.drsticker.data.injection.StorageConstants
+import vip.cdms.drsticker.data.utils.progressable
 import vip.cdms.drsticker.rule.Ruleset
 import vip.cdms.drsticker.rule.RulesetId
 import vip.cdms.drsticker.rule.RulesetIndexEntry
@@ -21,6 +26,7 @@ import javax.inject.Singleton
 class RulesetRepository @Inject constructor(
     private val storageConstants: StorageConstants,
     @param:RulesetConfigJson private val json: Json,
+    private val stickerRepository: StickerRepository,
     private val triggerHandlers: Map<Class<*>, @JvmSuppressWildcards TriggerHandler<*>>,
     private val preprocessHandlers: Map<Class<*>, @JvmSuppressWildcards PreprocessHandler<*>>,
     private val adapterHandlers: Map<Class<*>, @JvmSuppressWildcards AdapterHandler<*>>,
@@ -92,6 +98,77 @@ class RulesetRepository @Inject constructor(
         cacheFile.writeBytes(sticker.bytes)
         extensionFile.writeText(sticker.extension)
         return cacheFile
+    }
+
+    fun getEnabledRulesets() = getRulesetIndexes()
+        .asSequence()
+        .filter { it.isEnabled }
+        .map { getRuleset(it.rulesetId) }
+        .toList()
+
+    suspend fun prePreprocessStickerSetStickers(setId: StickerSetId) {
+        val rulesets = getEnabledRulesets()
+            .filter { it.preprocesses.isNotEmpty() }
+        if (rulesets.isEmpty()) return
+
+        val stickers = stickerRepository.getMergedStickerSet(setId).stickers
+        if (stickers.isEmpty()) return
+
+        progressable(total = stickers.size * (rulesets.size + 1)) {
+            for (sticker in stickers) {
+                val stickerName = sticker.tags.firstOrNull() ?: sticker.stickerId
+                val original = progressable {
+                    stickerRepository.fetchStickerResource(
+                        setId = setId,
+                        stickerId = sticker.stickerId,
+                        resource = sticker.resource,
+                    )
+                }
+                for (ruleset in rulesets) progressable {
+                    report(null, label = "Processing $stickerName")
+                    preprocessSticker(
+                        setId = setId,
+                        stickerId = sticker.stickerId,
+                        ruleset = ruleset,
+                        original = original,
+                        originalExtension = sticker.resource.getRealExtension(),
+                    )
+                }
+            }
+        }
+    }
+
+    suspend fun preprocessSticker(
+        setId: StickerSetId,
+        stickerId: StickerId,
+        ruleset: Ruleset,
+        original: File,
+        originalExtension: String,
+    ): File = progressable {
+        report(null, label = "Preprocessing ${ruleset.displayName}")
+        val preprocesses = ruleset.preprocesses
+        if (preprocesses.isEmpty()) return@progressable original
+
+        val cacheKey = PreprocessCacheKey(setId, stickerId, preprocesses)
+        withContext(Dispatchers.IO) {
+            getPreprocessCache(cacheKey)
+        }?.let { return@progressable it }
+
+        val initial = ProcessingSticker(original.readBytes(), originalExtension)
+        var processed = initial
+        for ((index, config) in preprocesses.withIndex()) {
+            val output = getPreprocessHandler(config)
+                .process(config, processed)
+            if (output == null) {
+                if (processed === initial) return@progressable original
+                break
+            }
+            processed = output
+            report((index + 1f) / preprocesses.size)
+        }
+        withContext(Dispatchers.IO) {
+            updatePreprocessCache(cacheKey, processed)
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

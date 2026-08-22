@@ -5,9 +5,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
@@ -16,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -35,6 +34,7 @@ class FullScreenDialogScope(
 fun FullScreenDialog(
     visible: Boolean,
     onDismissRequest: () -> Unit,
+    progress: (() -> Float)? = null,
     title: @Composable () -> Unit,
     actions: (@Composable () -> Unit)? = null,
     content: @Composable FullScreenDialogScope.(PaddingValues) -> Unit
@@ -50,33 +50,47 @@ fun FullScreenDialog(
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
-                TopAppBar(
-                    title = {
-                        CompositionLocalProvider(
-                            LocalTextStyle provides MaterialTheme.typography.titleLarge.copy(
-                                fontSize = 20.sp
-                            ),
-                            content = title
+                Column {
+                    TopAppBar(
+                        title = {
+                            CompositionLocalProvider(
+                                LocalTextStyle provides MaterialTheme.typography.titleLarge.copy(
+                                    fontSize = 20.sp
+                                ),
+                                content = title
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onDismissRequest) {
+                                Icon(Icons.Rounded.Close, contentDescription = null)
+                            }
+                        },
+                        actions = {
+                            actions?.let {
+                                it()
+                                Spacer(Modifier.size(8.dp))
+                            }
+                        },
+                        scrollBehavior = scrollBehavior,
+                    )
+                    progress?.let {
+                        LinearProgressIndicator(
+                            progress = it,
+                            modifier = Modifier.fillMaxWidth(),
+                            strokeCap = StrokeCap.Butt,
+                            gapSize = 0.dp,
+                            drawStopIndicator = {},
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onDismissRequest) {
-                            Icon(Icons.Rounded.Close, contentDescription = null)
-                        }
-                    },
-                    actions = {
-                        actions?.let {
-                            it()
-                            Spacer(Modifier.size(8.dp))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
+                    }
+                }
             },
             snackbarHost = { SnackbarHost(snackbarHostState) },
         ) {
             with(scope) {
-                content(it)
+                content(
+                    it + if (progress == null)
+                        PaddingValues.Zero else PaddingValues(top = 16.dp)
+                )
             }
         }
     }

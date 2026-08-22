@@ -1,5 +1,9 @@
 package vip.cdms.drsticker.data.repositories
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
@@ -8,8 +12,8 @@ import okio.sink
 import vip.cdms.drsticker.data.*
 import vip.cdms.drsticker.data.injection.StickerConfigJson
 import vip.cdms.drsticker.data.injection.StorageConstants
+import vip.cdms.drsticker.data.utils.progressable
 import java.io.File
-import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,7 +57,11 @@ class StickerRepository @Inject constructor(
         setStickerSetIndexes(listOf(setId) + indexes)
     }
 
-    suspend fun addStickerSet(source: StickerSourceConfig, overrides: StickerSetOverrides): StickerSetId {
+    suspend fun addStickerSet(
+        source: StickerSourceConfig,
+        overrides: StickerSetOverrides,
+    ): StickerSetId = progressable {
+        report(null, label = "Saving sticker set")
         val rawSet = fetchSourceStickerSet(source)
         val setId = rawSet.setId + "@" + getSourceMetadata(source).key
         val indexes = getStickerSetIndexes().toMutableList()
@@ -63,7 +71,7 @@ class StickerRepository @Inject constructor(
         updateStickerSourceEnv(source)
         indexes.add(0, setId)
         setStickerSetIndexes(indexes)
-        return setId
+        setId
     }
 
     suspend fun syncStickerSet(setId: StickerSetId) {
@@ -72,17 +80,36 @@ class StickerRepository @Inject constructor(
         cacheSourceStickerSet(setId, config.source, rawSet)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun cacheSourceStickerSet(
-        setId: StickerSetId,
-        config: StickerSourceConfig,
-        data: SourceStickerSet<SourceStickerResource>
-    ) {
-        val serializer = getSourceMetadata(config).value
-            .setSerializer as KSerializer<SourceStickerSet<SourceStickerResource>>
-        storageConstants
-            .getStickerSetSourceCacheFile(setId)
-            .writeText(json.encodeToString(serializer, data))
+    suspend fun preDownloadStickerSetStickers(setId: StickerSetId) {
+        val stickers = getMergedStickerSet(setId).stickers
+        if (stickers.isEmpty()) return
+
+        val tasks = stickers.flatMap { sticker ->
+            buildList {
+                val stickerName = sticker.tags.firstOrNull() ?: sticker.stickerId
+                add(Triple("Downloading $stickerName", sticker.stickerId, sticker.resource))
+                sticker.thumbnail?.let { thumbnail ->
+                    add(Triple("Downloading thumbnail for $stickerName", sticker.stickerId, thumbnail))
+                }
+            }
+        }
+        val dispatcher = Dispatchers.IO.limitedParallelism(4)
+        progressable(total = tasks.size) {
+            coroutineScope {
+                tasks.map { (label, stickerId, resource) ->
+                    async(dispatcher) {
+                        progressable {
+                            report(null, label = label)
+                            fetchStickerResource(
+                                setId = setId,
+                                stickerId = stickerId,
+                                resource = resource,
+                            )
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -102,17 +129,22 @@ class StickerRepository @Inject constructor(
     fun updateStickerSetOverrides(setId: StickerSetId, overrides: StickerSetOverrides) =
         setStickerSet(getStickerSetConfig(setId).copy(overrides = overrides))
 
-    suspend fun updateStickerSetSource(setId: StickerSetId, source: StickerSourceConfig) {
+    suspend fun updateStickerSetSource(
+        setId: StickerSetId,
+        source: StickerSourceConfig,
+    ) = progressable {
+        report(null, label = "Updating sticker set source")
         val config = getStickerSetConfig(setId)
         require(config.source::class == source::class) {
             "Changing sticker set source type is not supported."
         }
 
-        if (hasSameEffectiveSource(config.source, source)) return
-        val rawSet = fetchSourceStickerSet(source)
-        setStickerSet(config.copy(source = source))
-        cacheSourceStickerSet(setId, source, rawSet)
-        updateStickerSourceEnv(source)
+        if (!hasSameEffectiveSource(config.source, source)) {
+            val rawSet = fetchSourceStickerSet(source)
+            setStickerSet(config.copy(source = source))
+            cacheSourceStickerSet(setId, source, rawSet)
+            updateStickerSourceEnv(source)
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -132,6 +164,19 @@ class StickerRepository @Inject constructor(
             }
         )
         return effectiveJson(first) == effectiveJson(second)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun cacheSourceStickerSet(
+        setId: StickerSetId,
+        config: StickerSourceConfig,
+        data: SourceStickerSet<SourceStickerResource>
+    ) {
+        val serializer = getSourceMetadata(config).value
+            .setSerializer as KSerializer<SourceStickerSet<SourceStickerResource>>
+        storageConstants
+            .getStickerSetSourceCacheFile(setId)
+            .writeText(json.encodeToString(serializer, data))
     }
 
     private fun setStickerSet(config: StickerSetConfig) = storageConstants

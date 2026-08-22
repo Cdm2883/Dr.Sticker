@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +33,7 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import vip.cdms.drsticker.data.*
+import vip.cdms.drsticker.data.utils.ProgressableSnapshot
 import vip.cdms.drsticker.ui.components.*
 import vip.cdms.drsticker.ui.models.*
 import vip.cdms.drsticker.ui.theme.darkTheme
@@ -52,6 +54,7 @@ fun StickerSetsPage(
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val progressState by viewModel.progressState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val lazyListState = rememberLazyListState()
     val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -235,6 +238,7 @@ fun StickerSetsPage(
 
     StickerSetConfigDialog(
         state = state.configState,
+        progressState = progressState,
         metadataProvider = viewModel::getSourceMetadata,
         onDismissRequest = viewModel::closeStickerSetConfig,
         onAdd = viewModel::addStickerSet,
@@ -572,10 +576,11 @@ private fun PickStickerSetDialog(
 @Composable
 private fun StickerSetConfigDialog(
     state: StickerSetConfigState,
+    progressState: ProgressableSnapshot?,
     metadataProvider: (String) -> StickerSourceMetadata<*>,
     onDismissRequest: () -> Unit,
-    onAdd: (StickerSourceConfig, StickerSetOverrides) -> Unit,
-    onUpdate: (StickerSetId, StickerSourceConfig, StickerSetOverrides) -> Unit,
+    onAdd: (StickerSourceConfig, StickerSetOverrides, Boolean, Boolean) -> Unit,
+    onUpdate: (StickerSetId, StickerSourceConfig, StickerSetOverrides, Boolean, Boolean) -> Unit,
 ) {
     val formKey = when (state) {  // compose key
         is StickerSetConfigState.Add -> "add:${state.sourceKey}"
@@ -596,6 +601,8 @@ private fun StickerSetConfigDialog(
     var description by remember(formKey) {
         mutableStateOf(initialOverrides.description.orEmpty())
     }
+    var preDownload by remember(formKey) { mutableStateOf(false) }
+    var prePreprocess by remember(formKey) { mutableStateOf(false) }
 
     val saveState = when (state) {
         is StickerSetConfigState.Add -> state.saveState
@@ -609,6 +616,9 @@ private fun StickerSetConfigDialog(
             if (saveState !is StickerSetConfigSaveState.Saving)
                 onDismissRequest()
         },
+        progress = progressState
+            ?.takeIf { saveState is StickerSetConfigSaveState.Saving }
+            ?.let { snapshot -> { snapshot.fraction } },
         title = {
             val title = if (addState != null) "Add sticker set"
             else if (editState != null) "Edit sticker set"
@@ -634,9 +644,9 @@ private fun StickerSetConfigDialog(
                         description = description.ifBlank { null },
                     )
                     if (editState == null) {
-                        onAdd(source, overrides)
+                        onAdd(source, overrides, preDownload, prePreprocess)
                     } else {
-                        onUpdate(editState.setId, source, overrides)
+                        onUpdate(editState.setId, source, overrides, preDownload, prePreprocess)
                     }
                 },
                 shapes = ButtonDefaults.shapes(),
@@ -654,6 +664,19 @@ private fun StickerSetConfigDialog(
                     .padding(bottom = 200.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                progressState
+                    ?.takeUnless { saveState is StickerSetConfigSaveState.Idle }
+                    ?.labels
+                    ?.filterNotNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { labels ->
+                        Text(
+                            text = labels.joinToString(" > ") + "...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+
                 if (saveState is StickerSetConfigSaveState.Error) Text(
                     text = saveState.error.readableMessage(),
                     color = MaterialTheme.colorScheme.error,
@@ -692,6 +715,36 @@ private fun StickerSetConfigDialog(
                 if (sourceMetadata != null) with(sourceMetadata) {
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                     sourceConfigScope.Settings()
+                }
+
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = preDownload,
+                            onCheckedChange = {
+                                preDownload = it
+                                if (!it) prePreprocess = false
+                            },
+                        )
+                        Text(
+                            text = "Pre-download all stickers",
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = prePreprocess,
+                            onCheckedChange = { prePreprocess = it },
+                            enabled = preDownload,
+                        )
+                        Text(
+                            text = "Pre-preprocess all stickers",
+                            modifier = Modifier.alpha(if (preDownload) 1f else /* DisabledContainerOpacity */ 0.38f)
+                        )
+                    }
                 }
             }
 

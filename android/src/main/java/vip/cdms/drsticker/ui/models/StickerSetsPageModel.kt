@@ -12,8 +12,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.cdms.drsticker.data.*
+import vip.cdms.drsticker.data.repositories.RulesetRepository
 import vip.cdms.drsticker.data.repositories.StatisticRepository
 import vip.cdms.drsticker.data.repositories.StickerRepository
+import vip.cdms.drsticker.data.utils.ProgressableController
 import javax.inject.Inject
 
 data class StickersPageState(
@@ -93,12 +95,15 @@ sealed interface StickerSetListEntry {
 @HiltViewModel
 class StickerSetsPageModel @Inject constructor(
     private val stickerRepository: StickerRepository,
+    private val rulesetRepository: RulesetRepository,
     private val statisticRepository: StatisticRepository,
+    private val progressableController: ProgressableController,
 ) : ViewModel() {
     private val repositoryMutex = Mutex()
     private var dividerKey = 0
     private val _state = MutableStateFlow(StickersPageState())
     val state = _state.asStateFlow()
+    val progressState = progressableController.state
 
     init {
         reloadPage()
@@ -290,7 +295,9 @@ class StickerSetsPageModel @Inject constructor(
     fun addStickerSet(
         source: StickerSourceConfig,
         overrides: StickerSetOverrides,
-    ) = saveStickerSetConfig {
+        preDownload: Boolean,
+        prePreprocess: Boolean,
+    ) = saveStickerSetConfig(preDownload, prePreprocess) {
         stickerRepository.addStickerSet(source, overrides)
     }
 
@@ -298,13 +305,17 @@ class StickerSetsPageModel @Inject constructor(
         setId: StickerSetId,
         source: StickerSourceConfig,
         overrides: StickerSetOverrides,
-    ) = saveStickerSetConfig {
+        preDownload: Boolean,
+        prePreprocess: Boolean,
+    ) = saveStickerSetConfig(preDownload, prePreprocess) {
         stickerRepository.updateStickerSetSource(setId, source)
         stickerRepository.updateStickerSetOverrides(setId, overrides)
         setId
     }
 
     private fun saveStickerSetConfig(
+        preDownload: Boolean,
+        prePreprocess: Boolean,
         operation: suspend () -> StickerSetId,
     ) {
         val target = _state.value.configState
@@ -314,15 +325,23 @@ class StickerSetsPageModel @Inject constructor(
         check(target.saveStateOrNull() !is StickerSetConfigSaveState.Saving) {
             "Sticker set config is already saving."
         }
+        progressableController.reset()
         _state.update { it.copy(configState = target.withSaveState(StickerSetConfigSaveState.Saving)) }
         launchRepositoryOperation {
             try {
-                operation()
-                _state.update {
-                    it.copy(
-                        entries = getPageEntries(),
-                        configState = StickerSetConfigState.Closed,
-                    )
+                progressableController.collect {
+                    val setId = operation()
+                    if (preDownload)
+                        stickerRepository.preDownloadStickerSetStickers(setId)
+                    if (prePreprocess)
+                        rulesetRepository.prePreprocessStickerSetStickers(setId)
+                    val entries = getPageEntries()
+                    _state.update {
+                        it.copy(
+                            entries = entries,
+                            configState = StickerSetConfigState.Closed,
+                        )
+                    }
                 }
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
