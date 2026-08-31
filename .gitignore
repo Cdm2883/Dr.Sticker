@@ -10,7 +10,10 @@
 .idea/misc.xml
 
 ### Android ###
-release/
+android/release/
+android/.cxx/
+android/libs/ffmpeg/source
+android/libs/ffmpeg/build
 
 ### Kotlin ###
 /.kotlin

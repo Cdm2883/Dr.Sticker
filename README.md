@@ -15,6 +15,7 @@ WIP
 ### Credits
 
 - [gkd-kit/gkd](https://github.com/gkd-kit/gkd) - Referenced for the Shizuku gesture injection implementation.
+- [FFmpeg](https://ffmpeg.org/) - Multimedia framework used for media processing, licensed under the LGPL/GPL.
 
 ### License
 

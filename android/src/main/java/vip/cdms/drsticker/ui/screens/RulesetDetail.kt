@@ -485,7 +485,11 @@ private fun PreprocessesTabContent(
                     onDismissRequest = { editingIndex = null },
                     title = { Text("Edit preprocess") },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             metadataProvider(draft).Editor(draft) { draft = it }
                         }
                     },

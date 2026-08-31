@@ -12,6 +12,7 @@ plugins {
 android {
     namespace = "vip.cdms.drsticker"
     compileSdk = 36
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "vip.cdms.drsticker"
@@ -26,8 +27,29 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        @Suppress("UnstableApiUsage")
+        externalNativeBuild {
+            cmake {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            }
+        }
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = false
+        }
+    }
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -38,6 +60,14 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("preview") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+            resValue("string", "app_name", "Pr.Sticker")
+            resValue("color", "ic_launcher_background_color", "#143723")
         }
     }
     compileOptions {
