@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,6 +32,7 @@ import vip.cdms.drsticker.services.StickerServiceState
 import vip.cdms.drsticker.ui.components.AboutBottomSheet
 import vip.cdms.drsticker.ui.models.MainScreenModel
 import vip.cdms.drsticker.ui.utils.rememberScrollToHideBottomBarState
+import vip.cdms.drsticker.utils.vibrate
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +70,8 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
             MainFloatingActionButton(
                 viewModel = viewModel,
                 modifier = Modifier.offset { scrollToHideBottomBarState.bottomBarOffset },
+                isAtSettings = currentDestination?.hasRoute<SettingsRoute>() == true,
+                onClickSettings = { navController.navigate(SettingsRoute) },
                 onClickAbout = { showAboutBottomSheet = true },
             )
         },
@@ -88,6 +92,17 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
                     popExitTransition = navBarExitTransition
                 ) {
                     DashboardPage()
+                }
+
+                composable<SettingsRoute>(
+                    enterTransition = { slideInVertically { it } },
+                    exitTransition = { slideOutVertically { it } },
+                    popEnterTransition = { slideInVertically { -it } },
+                    popExitTransition = { slideOutVertically { it } },
+                ) {
+                    SettingsPage(
+                        onBack = { navController.popBackStack() },
+                    )
                 }
 
                 composable<StickerSetsRoute>(
@@ -152,15 +167,20 @@ fun MainScreen(viewModel: MainScreenModel = hiltViewModel()) {
 private fun MainFloatingActionButton(
     viewModel: MainScreenModel,
     modifier: Modifier = Modifier,
+    isAtSettings: Boolean,
+    onClickSettings: () -> Unit,
     onClickAbout: () -> Unit,
 ) {
+    val context = LocalContext.current
     val serviceState by viewModel.serviceState.collectAsStateWithLifecycle()
     val activated = serviceState == StickerServiceState.Running
     var expanded by rememberSaveable { mutableStateOf(false) }
 
     val items = listOf(
         Icons.Rounded.Layers to "Open Sheet" to viewModel::openPickerSheet,
-        Icons.Rounded.Settings to "Settings" to { TODO() },
+        Icons.Rounded.Settings to "Settings" to {
+            if (isAtSettings) vibrate(context) else onClickSettings()
+        },
         Icons.Rounded.Info to "About" to onClickAbout,
     )
 

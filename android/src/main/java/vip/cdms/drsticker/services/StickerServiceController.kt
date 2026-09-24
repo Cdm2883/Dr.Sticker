@@ -1,6 +1,5 @@
 package vip.cdms.drsticker.services
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
@@ -10,7 +9,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import vip.cdms.drsticker.data.injection.PreferencesStoreProvider
 import vip.cdms.drsticker.data.repositories.RulesetRepository
+import vip.cdms.drsticker.data.repositories.SettingsRepository
+import vip.cdms.drsticker.data.utils.WriteMode
+import vip.cdms.drsticker.data.utils.boolean
 import vip.cdms.drsticker.rule.adapters.AccessibilityDropAdapter
 import vip.cdms.drsticker.rule.adapters.ShizukuDropAdapter
 import vip.cdms.drsticker.services.utils.*
@@ -29,28 +32,12 @@ sealed interface StickerServiceState {
 @Singleton
 class StickerServiceController @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    preferencesProvider: PreferencesStoreProvider,
+    private val settingsRepository: SettingsRepository,
     private val rulesetRepository: RulesetRepository,
 ) {
-    private companion object {
-        const val PREFERENCES_NAME = "sticker_service"
-        const val KEY_ENABLED = "enabled"
-    }
-
-    private val preferences = context.getSharedPreferences(
-        PREFERENCES_NAME,
-        Context.MODE_PRIVATE,
-    )
-
-    var isSettingsEnabled: Boolean
-        get() = preferences.getBoolean(KEY_ENABLED, false)
-        @SuppressLint("UseKtx")
-        set(value) = check(
-            preferences.edit()
-                .putBoolean(KEY_ENABLED, value)
-                .commit()
-        ) {
-            "Failed to persist sticker service enabled state."
-        }
+    private val preferences = preferencesProvider.get("sticker_service")
+    var isSettingsEnabled by preferences.boolean("enabled", false, WriteMode.COMMIT)
 
     private val _state = MutableStateFlow<StickerServiceState>(StickerServiceState.Stopped)
     val state = _state.asStateFlow()
@@ -109,7 +96,6 @@ class StickerServiceController @Inject constructor(
 
     private fun ensurePermissionsGranted(): Boolean {
         if (!ensureOverlayPermissionGranted(context)) return false
-        if (!ensureBatteryOptimizationExemptionGranted(context)) return false
 
         val rulesets = rulesetRepository.getRulesetIndexes()
             .map { rulesetRepository.getRuleset(it.rulesetId) }
@@ -120,7 +106,7 @@ class StickerServiceController @Inject constructor(
             .any { it.adapter is ShizukuDropAdapter }
 
         // condition system
-        val useShizukuConditionFirst = true
+        val useShizukuConditionFirst = !settingsRepository.preferAccessibilityService.value
         if (!isShizukuInstalled(context))
             needsAccessibility = true
         else if (!needsAccessibility && useShizukuConditionFirst)

@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
+    implementation(libs.zhanghai.compose.preference)
     implementation(libs.ereza.customactivityoncrash)
     implementation(libs.mt.data.files.provider)
     implementation(libs.kotlinx.serialization.json)

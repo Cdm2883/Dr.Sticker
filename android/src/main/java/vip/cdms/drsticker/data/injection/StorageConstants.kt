@@ -31,7 +31,7 @@ class StorageConstants @Inject constructor(
         getStickerSetDir(setId).resolve("metadata.json")
 
     fun getStickerSetSourceCacheFile(setId: StickerSetId) =
-        getStickerSetDir(setId).resolve("cache.json")
+        getStickerSetDir(setId).resolve("source.json")
 
     fun getStickerCacheFile(setId: StickerSetId, stickerId: StickerId?, extension: String) =
         getStickerSetDir(setId).resolve("${stickerId ?: ""}.$extension")
