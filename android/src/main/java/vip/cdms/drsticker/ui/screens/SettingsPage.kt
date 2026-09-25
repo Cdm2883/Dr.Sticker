@@ -116,7 +116,22 @@ fun SettingsPage(
 
                 item(contentType = "SwitchPreference") {
                     SwitchPreference(
-                        // state = settingsRepository.suggestedStickers.state(),
+                        state = settingsRepository.showPickerFromTop.state(),
+                        title = { Text("Show Picker from Top") },
+                        summary = { Text("Display the sticker picker from the top of the screen instead of the bottom.") },
+                    )
+                }
+
+                item(contentType = "SwitchPreference") {
+                    SwitchPreference(
+                        state = settingsRepository.keepPickerOpen.state(),
+                        title = { Text("Keep Picker Open") },
+                        summary = { Text("Remove the dim overlay and keep the picker open after sending.") },
+                    )
+                }
+
+                item(contentType = "SwitchPreference") {
+                    SwitchPreference(
                         value = false,
                         onValueChange = {},
                         title = { Text("Suggested Stickers") },

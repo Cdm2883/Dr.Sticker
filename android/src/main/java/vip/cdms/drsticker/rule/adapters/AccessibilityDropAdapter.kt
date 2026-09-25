@@ -30,7 +30,7 @@ data class AccessibilityDropAdapter(
     val slowDurationMillis: Long = 10L,
     val fastDurationMillis: Long = 40L,
     override val dragTargetXExpression: String = $$"$screenWidth / 2",
-    override val dragTargetYExpression: String = $$"$screenHeight / 2",
+    override val dragTargetYExpression: String = $$"$screenHeight / 2 + 800",
     override val overlaySizePx: Int = 160,
     override val gestureDelayMillis: Long = 50L,
     override val overlayOffsetYPx: Int = -200,

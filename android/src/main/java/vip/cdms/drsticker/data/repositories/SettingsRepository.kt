@@ -13,4 +13,10 @@ class SettingsRepository @Inject constructor(
 
     val preferAccessibilityService =
         preferences.boolean("prefer_accessibility_service", false)
+
+    val showPickerFromTop =
+        preferences.boolean("show_picker_from_top", false)
+
+    val keepPickerOpen =
+        preferences.boolean("keep_picker_open", false)
 }

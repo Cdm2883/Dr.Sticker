@@ -24,7 +24,7 @@ import javax.inject.Inject
 data class ShizukuDropAdapter(
     val gestureDurationMillis: Long = 40,
     override val dragTargetXExpression: String = $$"$screenWidth / 2",
-    override val dragTargetYExpression: String = $$"$screenHeight / 2",
+    override val dragTargetYExpression: String = $$"$screenHeight / 2 + 800",
     override val overlaySizePx: Int = 160,
     override val gestureDelayMillis: Long = 50,
     override val overlayOffsetYPx: Int = -200,

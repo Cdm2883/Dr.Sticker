@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.update
 import vip.cdms.drsticker.data.SourceStickerResource
 import vip.cdms.drsticker.data.StickerId
 import vip.cdms.drsticker.data.StickerSetId
+import vip.cdms.drsticker.data.repositories.SettingsRepository
 import vip.cdms.drsticker.data.repositories.StatisticRepository
 import vip.cdms.drsticker.data.repositories.StickerRepository
 import javax.inject.Inject
@@ -55,6 +56,7 @@ class StickerPickerSheetModel @Inject constructor(
     private val stickerRepository: StickerRepository,
     private val statisticRepository: StatisticRepository,
     private val preferences: StickerPickerSheetPreferences,
+    val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     private val loadDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(2)
     private val loadingJobs = mutableMapOf<StickerSetId, Job>()

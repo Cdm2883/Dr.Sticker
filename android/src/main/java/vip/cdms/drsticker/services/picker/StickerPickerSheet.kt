@@ -29,8 +29,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -45,7 +48,10 @@ import kotlin.math.roundToInt
 @Composable
 internal fun StickerPickerSheet(
     viewModel: StickerPickerSheetModel,
-) = Box(Modifier.fillMaxSize()) {
+) {
+    val showPickerFromTop = viewModel.settingsRepository.showPickerFromTop.value
+    val keepPickerOpen = viewModel.settingsRepository.keepPickerOpen.value
+
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
@@ -81,62 +87,89 @@ internal fun StickerPickerSheet(
         )
     }
 
-    BackHandler {
+    if (!keepPickerOpen) BackHandler {
         if (sheetHeight.value > collapsedHeightPx) collapse() else dismiss()
     }
 
     val currentHeightPx = sheetHeight.value
-    Spacer(
-        Modifier
-            .fillMaxSize()
-            .background(
-                Color.Black.copy(
-                    alpha = (currentHeightPx / expandedHeightPx).coerceIn(0f, 0.5f)
+    Box(
+        modifier = if (keepPickerOpen)
+            Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .padding(
+                    top = if (!showPickerFromTop) 16.dp else 0.dp,  // shadow
+                    bottom = if (showPickerFromTop) 16.dp else 0.dp,
                 )
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = ::dismiss,
-            )
-    )
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .offset { IntOffset(0, (screenHeightPx - currentHeightPx).roundToInt()) }
-            .height(with(density) { currentHeightPx.toDp() })
-            .shadow(16.dp)
-            .background(MaterialTheme.colorScheme.surface)
-            .pointerInput(screenHeightPx) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        when {
-                            sheetHeight.value < screenHeightPx * 0.35f -> dismiss()
-                            sheetHeight.value < screenHeightPx * 0.75f -> collapse()
-                            else -> expand()
-                        }
-                    },
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        scope.launch {
-                            sheetHeight.snapTo(
-                                (sheetHeight.value - dragAmount).coerceIn(50f, expandedHeightPx)
-                            )
-                        }
-                    },
-                )
-            }
-            .clickable(enabled = false) {},
-        horizontalAlignment = Alignment.CenterHorizontally
+        else
+            Modifier.fillMaxSize()
     ) {
+        if (!keepPickerOpen) Spacer(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Color.Black.copy(
+                        alpha = (currentHeightPx / expandedHeightPx).coerceIn(0f, 0.5f)
+                    )
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = ::dismiss,
+                )
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset {
+                    if (keepPickerOpen || showPickerFromTop) {
+                        IntOffset.Zero
+                    } else {
+                        IntOffset(0, (screenHeightPx - currentHeightPx).roundToInt())
+                    }
+                }
+                .height(with(density) { currentHeightPx.toDp() })
+                .shadow(if (showPickerFromTop) 8.dp else 16.dp)
+                .background(MaterialTheme.colorScheme.surface)
+                .pointerInput(screenHeightPx, showPickerFromTop) {
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            when {
+                                sheetHeight.value < screenHeightPx * 0.35f -> dismiss()
+                                sheetHeight.value < screenHeightPx * 0.75f -> collapse()
+                                else -> expand()
+                            }
+                        },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            scope.launch {
+                                val newHeight = if (showPickerFromTop)
+                                    sheetHeight.value + dragAmount
+                                else
+                                    sheetHeight.value - dragAmount
+                                sheetHeight.snapTo(
+                                    newHeight.coerceIn(50f, expandedHeightPx)
+                                )
+                            }
+                        },
+                    )
+                }
+                .clickable(enabled = false) {},
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 //        BottomSheetDefaults.DragHandle()
-        StickerPickerSheetContent(viewModel)
+            StickerPickerSheetContent(
+                viewModel = viewModel,
+                showPickerFromTop = showPickerFromTop,
+            )
+        }
     }
 }
 
 @Composable
-private fun StickerPickerSheetContent(
+private fun ColumnScope.StickerPickerSheetContent(
     viewModel: StickerPickerSheetModel,
+    showPickerFromTop: Boolean,
 ) {
     val scope = rememberCoroutineScope()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -176,26 +209,59 @@ private fun StickerPickerSheetContent(
             )
         }
     else {
-        StickerSetRow(
-            state = state,
-            rowState = rowState,
-            viewModel = viewModel,
-            onStickerSetClick = { setId ->
-                scope.launch {
-                    if (!viewModel.prepareGridThrough(setId)) return@launch
-                    val itemIndex = viewModel.state.value
-                        .gridItemIndex(gridHeaderKey(setId)) ?: return@launch
-                    gridState.animateScrollToItem(itemIndex)
-                }
-            },
-        )
-        HorizontalDivider()
-        StickerGrid(
-            state = state,
-            gridState = gridState,
-            rowState = rowState,
-            viewModel = viewModel,
-        )
+        if (showPickerFromTop) {
+            StickerGrid(
+                state = state,
+                gridState = gridState,
+                rowState = rowState,
+                viewModel = viewModel,
+                showPickerFromTop = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+            HorizontalDivider()
+            StickerSetRow(
+                state = state,
+                rowState = rowState,
+                viewModel = viewModel,
+                showPickerFromTop = true,
+                onStickerSetClick = { setId ->
+                    scope.launch {
+                        if (!viewModel.prepareGridThrough(setId)) return@launch
+                        val itemIndex = viewModel.state.value
+                            .gridItemIndex(gridHeaderKey(setId)) ?: return@launch
+                        gridState.animateScrollToItem(itemIndex)
+                    }
+                },
+            )
+        } else {
+            StickerSetRow(
+                state = state,
+                rowState = rowState,
+                viewModel = viewModel,
+                showPickerFromTop = false,
+                onStickerSetClick = { setId ->
+                    scope.launch {
+                        if (!viewModel.prepareGridThrough(setId)) return@launch
+                        val itemIndex = viewModel.state.value
+                            .gridItemIndex(gridHeaderKey(setId)) ?: return@launch
+                        gridState.animateScrollToItem(itemIndex)
+                    }
+                },
+            )
+            HorizontalDivider()
+            StickerGrid(
+                state = state,
+                gridState = gridState,
+                rowState = rowState,
+                viewModel = viewModel,
+                showPickerFromTop = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
     }
 }
 
@@ -204,6 +270,7 @@ private fun StickerSetRow(
     state: StickerPickerSheetState,
     rowState: LazyListState,
     viewModel: StickerPickerSheetModel,
+    showPickerFromTop: Boolean,
     onStickerSetClick: (StickerSetId) -> Unit,
 ) {
     val entries = state.indexEntries
@@ -362,8 +429,12 @@ private fun StickerSetRow(
 
         Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 16.dp, end = 12.dp)
+                .align(if (showPickerFromTop) Alignment.BottomEnd else Alignment.TopEnd)
+                .padding(
+                    top = if (showPickerFromTop) 0.dp else 16.dp,
+                    bottom = if (showPickerFromTop) 16.dp else 0.dp,
+                    end = 12.dp,
+                )
                 .size(itemSize)
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.secondary)
@@ -372,8 +443,9 @@ private fun StickerSetRow(
                 },
             contentAlignment = Alignment.Center,
         ) {
+            val baseRotation = if (showPickerFromTop) 180f else 0f
             val rotation by animateFloatAsState(
-                targetValue = if (isExpanded) 180f else 0f
+                targetValue = if (isExpanded) baseRotation + 180f else baseRotation
             )
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
@@ -438,6 +510,8 @@ private fun StickerGrid(
     gridState: LazyGridState,
     rowState: LazyListState,
     viewModel: StickerPickerSheetModel,
+    showPickerFromTop: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val stableEntries = state.indexEntries.take(state.stableGridEntryCount)
     DisposableEffect(gridState) {
@@ -484,74 +558,86 @@ private fun StickerGrid(
         }
     }
 
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Fixed(5),
-        contentPadding = PaddingValues(12.dp) + PaddingValues(bottom = 6.dp + 8.dp * 22),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.fillMaxSize(),
+    CompositionLocalProvider(
+        LocalLayoutDirection provides if (showPickerFromTop) LayoutDirection.Rtl else LayoutDirection.Ltr
     ) {
-        stableEntries.forEach { entry ->
-            when (entry) {
-                is StickerPickerIndexEntry.Divider -> item(
-                    key = gridDividerKey(entry.ordinal),
-                    span = { GridItemSpan(maxLineSpan) },
-                ) {
-                    HorizontalDivider(
-                        modifier = Modifier
-                            .padding(vertical = 6.dp)
-                            .padding(top = 8.dp)
-                    )
-                }
-
-                is StickerPickerIndexEntry.StickerSet -> when (
-                    val setState = state.setStates[entry.setId]
-                ) {
-                    is StickerPickerSetState.Loaded -> {
-                        item(
-                            key = gridHeaderKey(entry.setId),
-                            span = { GridItemSpan(maxLineSpan) },
-                        ) {
-                            Text(
-                                text = setState.displayName,
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
-                            )
-                        }
-                        items(
-                            items = setState.stickers,
-                            key = ::gridStickerKey,
-                        ) { sticker ->
-                            StickerResourcePreview(
-                                resource = sticker.thumbnail ?: sticker.resource,
-                                setId = sticker.setId,
-                                stickerId = sticker.stickerId,
-                                modifier = Modifier
-                                    .aspectRatio(1f)
-                                    .clip(MaterialTheme.shapes.small)
-                                    .clickable { viewModel.selectSticker(sticker) },
-                            )
-                        }
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(5),
+            contentPadding =
+                if (showPickerFromTop) PaddingValues(12.dp) + PaddingValues(top = 6.dp + 8.dp * 22)
+                else PaddingValues(12.dp) + PaddingValues(bottom = 6.dp + 8.dp * 22),
+            reverseLayout = showPickerFromTop,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = modifier,
+        ) {
+            stableEntries.forEach { entry ->
+                when (entry) {
+                    is StickerPickerIndexEntry.Divider -> item(
+                        key = gridDividerKey(entry.ordinal),
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier
+                                .padding(vertical = 6.dp)
+                                .padding(top = 8.dp)
+                        )
                     }
 
-                    else -> Unit
+                    is StickerPickerIndexEntry.StickerSet -> when (
+                        val setState = state.setStates[entry.setId]
+                    ) {
+                        is StickerPickerSetState.Loaded -> {
+                            item(
+                                key = gridHeaderKey(entry.setId),
+                                span = { GridItemSpan(maxLineSpan) },
+                            ) {
+                                Text(
+                                    text = setState.displayName,
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    textAlign = if (showPickerFromTop) TextAlign.Right else TextAlign.Left,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 2.dp),
+                                )
+                            }
+                            items(
+                                items = setState.stickers,
+                                key = ::gridStickerKey,
+                            ) { sticker ->
+                                StickerResourcePreview(
+                                    resource = sticker.thumbnail ?: sticker.resource,
+                                    setId = sticker.setId,
+                                    stickerId = sticker.stickerId,
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clip(MaterialTheme.shapes.small)
+                                        .clickable { viewModel.selectSticker(sticker) },
+                                )
+                            }
+                        }
+
+                        else -> Unit
+                    }
                 }
             }
-        }
 
-        if (state.stableGridEntryCount < state.indexEntries.size) item(
-            key = LOADING_TAIL_KEY,
-            span = { GridItemSpan(maxLineSpan) },
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+            if (state.stableGridEntryCount < state.indexEntries.size) item(
+                key = LOADING_TAIL_KEY,
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
 }

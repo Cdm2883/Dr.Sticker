@@ -9,6 +9,7 @@ import vip.cdms.drsticker.data.SourceStickerResource
 import vip.cdms.drsticker.data.StickerId
 import vip.cdms.drsticker.data.StickerSetId
 import vip.cdms.drsticker.data.repositories.RulesetRepository
+import vip.cdms.drsticker.data.repositories.SettingsRepository
 import vip.cdms.drsticker.data.repositories.StatisticRepository
 import vip.cdms.drsticker.data.repositories.StickerRepository
 import vip.cdms.drsticker.rule.Ruleset
@@ -39,6 +40,9 @@ class StickerService : Service() {
 
     @Inject
     lateinit var stickerRepository: StickerRepository
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
 
     @Inject
     lateinit var statisticRepository: StatisticRepository
@@ -138,7 +142,8 @@ class StickerService : Service() {
     }
 
     private fun openPicker() = stickerPickerSheetController.show { setId, stickerId, resource ->
-        stickerPickerSheetController.hide()
+        if (!settingsRepository.keepPickerOpen.value)
+            stickerPickerSheetController.hide()
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             sendSticker(setId, stickerId, resource)
         }

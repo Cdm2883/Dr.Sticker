@@ -17,6 +17,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import vip.cdms.drsticker.data.SourceStickerResource
 import vip.cdms.drsticker.data.StickerId
 import vip.cdms.drsticker.data.StickerSetId
+import vip.cdms.drsticker.data.repositories.SettingsRepository
 import vip.cdms.drsticker.ui.theme.AppTheme
 import javax.inject.Inject
 import javax.inject.Provider
@@ -26,6 +27,7 @@ import javax.inject.Singleton
 class StickerPickerSheetController @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val modelProvider: Provider<StickerPickerSheetModel>,
+    private val settingsRepository: SettingsRepository,
 ) : AutoCloseable {
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var sheetWindow: SheetWindow? = null
@@ -48,6 +50,8 @@ class StickerPickerSheetController @Inject constructor(
     ) {
         check(Settings.canDrawOverlays(context)) { "Overlay permission is not granted." }
         hide()
+        val keepPickerOpen = settingsRepository.keepPickerOpen.value
+        val showPickerFromTop = settingsRepository.showPickerFromTop.value
 
         val owner = StickerPickerSheetOwner().apply { start() }
         val model = ViewModelProvider(owner, modelFactory)[StickerPickerSheetModel::class.java]
@@ -56,15 +60,16 @@ class StickerPickerSheetController @Inject constructor(
             onClose = ::hide,
         )
         val view = ComposeView(context).apply {
-            setOnKeyListener { _, keyCode, event ->
-                if (keyCode != KeyEvent.KEYCODE_BACK) return@setOnKeyListener false
-                if (event.action == KeyEvent.ACTION_UP) {
-                    owner.onBackPressedDispatcher.onBackPressed()
+            if (!keepPickerOpen) {
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode != KeyEvent.KEYCODE_BACK) return@setOnKeyListener false
+                    if (event.action == KeyEvent.ACTION_UP)
+                        owner.onBackPressedDispatcher.onBackPressed()
+                    true
                 }
-                true
+                isFocusableInTouchMode = true
+                requestFocus()
             }
-            isFocusableInTouchMode = true
-            requestFocus()
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
             setViewTreeViewModelStoreOwner(owner)
@@ -75,15 +80,31 @@ class StickerPickerSheetController @Inject constructor(
                 }
             }
         }
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-        }
+        val params = if (keepPickerOpen)
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = if (showPickerFromTop)
+                    Gravity.TOP or Gravity.START
+                else
+                    Gravity.BOTTOM or Gravity.START
+            }
+        else
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+            }
         try {
             windowManager.addView(view, params)
             sheetWindow = SheetWindow(view, owner)
