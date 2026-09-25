@@ -1,6 +1,7 @@
 package vip.cdms.drsticker.services
 
 import android.accessibilityservice.GestureDescription
+import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,9 +39,12 @@ class AccessibilityBridge @Inject constructor() {
     suspend fun dispatchGesture(
         stroke: GestureDescription.StrokeDescription,
     ): GestureResult {
-        val connectedService = service ?: return GestureResult.Unavailable
+        val connected = service ?: return GestureResult.Unavailable
         return suspendCancellableCoroutine { continuation ->
-            connectedService.dispatch(stroke, continuation)
+            connected.dispatch(stroke, continuation)
         }
     }
+
+    fun getFocusedNode(): AccessibilityNodeInfo? =
+        service?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 }

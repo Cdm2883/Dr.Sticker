@@ -15,7 +15,9 @@ import vip.cdms.drsticker.data.repositories.SettingsRepository
 import vip.cdms.drsticker.data.utils.WriteMode
 import vip.cdms.drsticker.data.utils.boolean
 import vip.cdms.drsticker.rule.adapters.AccessibilityDropAdapter
+import vip.cdms.drsticker.rule.adapters.AccessibilityPasteAdapter
 import vip.cdms.drsticker.rule.adapters.ShizukuDropAdapter
+import vip.cdms.drsticker.rule.adapters.ShizukuPasteAdapter
 import vip.cdms.drsticker.services.utils.*
 import vip.cdms.drsticker.utils.vibrate
 import javax.inject.Inject
@@ -79,6 +81,7 @@ class StickerServiceController @Inject constructor(
     @Synchronized
     fun restartIfRunning() {
         if (_state.value !is StickerServiceState.Running) return
+        if (!ensurePermissionsGranted()) return
 
         try {
             val intent = Intent(context, StickerService::class.java)
@@ -97,13 +100,16 @@ class StickerServiceController @Inject constructor(
     private fun ensurePermissionsGranted(): Boolean {
         if (!ensureOverlayPermissionGranted(context)) return false
 
-        val rulesets = rulesetRepository.getRulesetIndexes()
-            .map { rulesetRepository.getRuleset(it.rulesetId) }
+        val rulesets = rulesetRepository.getEnabledRulesets()
 
-        var needsAccessibility = rulesets
-            .any { it.adapter is AccessibilityDropAdapter }
-        var needsShizuku = rulesets
-            .any { it.adapter is ShizukuDropAdapter }
+        var needsAccessibility = rulesets.any {
+            it.adapter is AccessibilityDropAdapter
+                    || it.adapter is AccessibilityPasteAdapter
+        }
+        var needsShizuku = rulesets.any {
+            it.adapter is ShizukuDropAdapter
+                    || it.adapter is ShizukuPasteAdapter
+        }
 
         // condition system
         val useShizukuConditionFirst = !settingsRepository.preferAccessibilityService.value

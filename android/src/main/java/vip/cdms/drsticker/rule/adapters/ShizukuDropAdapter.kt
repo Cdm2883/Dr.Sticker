@@ -83,10 +83,8 @@ class ShizukuDropAdapterHandler @Inject constructor(
         startY: Int,
         endX: Int,
         endY: Int,
-    ) {
-        val ok = shizukuBridge.swipe(startX, startY, endX, endY, config.gestureDurationMillis)
-        if (!ok) error("Shizuku swipe failed or is unavailable.")
-    }
+    ) = check(shizukuBridge.swipe(startX, startY, endX, endY, config.gestureDurationMillis))
+    { "Shizuku swipe failed or is unavailable." }
 }
 
 @Module

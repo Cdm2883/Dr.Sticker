@@ -4,10 +4,7 @@ import android.annotation.SuppressLint
 import android.hardware.input.IInputManager
 import android.os.*
 import android.util.Log
-import android.view.Display
-import android.view.InputDevice
-import android.view.InputEvent
-import android.view.MotionEvent
+import android.view.*
 import java.io.FileDescriptor
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
@@ -41,6 +38,13 @@ class ShizukuInputManager {
             legacySwipe(x1, y1, x2, y2, durationMillis)
         }
     }
+
+    fun keyEvent(keyCode: Int): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runShellCommand("keyevent", keyCode.toString())
+        } else {
+            legacyKeyEvent(keyCode)
+        }
 
 
     // https://github.com/gkd-kit/gkd/blob/main/app/src/main/kotlin/li/songe/gkd/priv/BinderExt.kt
@@ -180,6 +184,29 @@ class ShizukuInputManager {
             y = y2,
             pressure = 0.0f,
         ) && success
+    }
+
+    private fun legacyKeyEvent(keyCode: Int): Boolean {
+        val now = SystemClock.uptimeMillis()
+        val event = KeyEvent(
+            /* downTime = */ now,
+            /* eventTime = */ now,
+            /* action = */ KeyEvent.ACTION_DOWN,
+            /* code = */ keyCode,
+            /* repeat = */ 0,
+            /* metaState = */ 0,
+            /* deviceId = */ KeyCharacterMap.VIRTUAL_KEYBOARD,
+            /* scancode = */ 0,
+            /* flags = */ 0,
+            /* source = */ InputDevice.SOURCE_KEYBOARD,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) runCatching {
+            KeyEvent::class.java
+                .getMethod("setDisplayId", Int::class.java)
+                .invoke(event, Display.INVALID_DISPLAY)
+        }
+        return injectInputEvent(event) &&
+                injectInputEvent(KeyEvent.changeAction(event, KeyEvent.ACTION_UP))
     }
 
     @Suppress("SameParameterValue")

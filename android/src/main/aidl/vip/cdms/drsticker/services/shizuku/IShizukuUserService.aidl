@@ -5,4 +5,5 @@ interface IShizukuUserService {
     void unregisterConditionListener();
 
     boolean swipe(int startX, int startY, int endX, int endY, long durationMillis);
+    boolean pasteClipboard(int keyCode);
 }

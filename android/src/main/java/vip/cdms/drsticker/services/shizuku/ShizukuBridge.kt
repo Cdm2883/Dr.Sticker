@@ -22,7 +22,7 @@ class ShizukuBridge @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var conditionConsumer: ((ConditionContext) -> Unit)? = null
-    private var activeSwipes = 0
+    private var activeOperations = 0
     private var service: IShizukuUserService? = null
     private var serviceArgs: Shizuku.UserServiceArgs? = null
     private var connection: ServiceConnection? = null
@@ -61,7 +61,7 @@ class ShizukuBridge @Inject constructor(
         endY: Int,
         durationMillis: Long,
     ): Boolean = withContext(Dispatchers.Main.immediate) {
-        activeSwipes++
+        activeOperations++
         try {
             val service = getService() ?: return@withContext false
             withContext(Dispatchers.Default) {
@@ -71,7 +71,23 @@ class ShizukuBridge @Inject constructor(
             Log.w(TAG, "Shizuku swipe failed.", cause)
             false
         } finally {
-            activeSwipes--
+            activeOperations--
+            applyDemand()
+        }
+    }
+
+    suspend fun pasteClipboard(
+        keyCode: Int = 279
+    ): Boolean = withContext(Dispatchers.Main.immediate) {
+        activeOperations++
+        try {
+            val service = getService() ?: return@withContext false
+            withContext(Dispatchers.Default) { service.pasteClipboard(keyCode) }
+        } catch (cause: Throwable) {
+            Log.w(TAG, "Shizuku paste failed.", cause)
+            false
+        } finally {
+            activeOperations--
             applyDemand()
         }
     }
@@ -85,7 +101,7 @@ class ShizukuBridge @Inject constructor(
                     Log.w(TAG, "Failed to register the Shizuku task-stack listener.")
                 }
             }
-        } else if (activeSwipes == 0) {
+        } else if (activeOperations == 0) {
             unbind()
         } else {
             service?.runCatching { unregisterConditionListener() }

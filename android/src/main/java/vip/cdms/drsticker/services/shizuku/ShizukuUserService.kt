@@ -34,6 +34,9 @@ class ShizukuUserService : IShizukuUserService.Stub() {
         durationMillis: Long,
     ) = inputInjector.swipe(startX, startY, endX, endY, durationMillis)
 
+    override fun pasteClipboard(keyCode: Int) =
+        inputInjector.keyEvent(keyCode)
+
     override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
         if (code == SHIZUKU_DESTROY_TRANSACTION) {
             taskObserver.unregister()
